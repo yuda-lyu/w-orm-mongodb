@@ -1,4 +1,4 @@
-//import w from './src/WOrm.mjs'
+//import w from './src/WOrmMongodb.mjs'
 import wo from './dist/w-orm-mongodb.umd.js'
 
 
