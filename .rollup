@@ -50,7 +50,7 @@ let optPlugins = [
 
 let fd_src = 'src/'
 let fd_tar = 'dist/'
-let cps = ["WOrm"]
+let cps = ["WOrmMongodb"]
 
 
 let rs = _.map(cps, function(v) {
