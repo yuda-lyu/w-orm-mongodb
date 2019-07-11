@@ -37,10 +37,10 @@ function WOrm(opt) {
      * 查詢資料
      *
      * @memberOf WOrm
-     * @param {Object} find 輸入查詢條件物件
+     * @param {Object} [find={}] 輸入查詢條件物件
      * @returns {Promise} 回傳Promise，resolve回傳數據，reject回傳錯誤訊息
      */
-    async function select(find) {
+    async function select(find = {}) {
 
         //pm
         let pm = genPm()
@@ -295,9 +295,10 @@ function WOrm(opt) {
      * 刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
      *
      * @memberOf WOrm
+     * @param {Object} [find={}] 輸入查詢條件物件
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
-    async function delAll() {
+    async function delAll(find = {}) {
 
         //pm
         let pm = genPm()
@@ -311,7 +312,7 @@ function WOrm(opt) {
 
         //deleteOne
         collection
-            .deleteMany({}, function(err, res) {
+            .deleteMany(find, function(err, res) {
                 if (err) {
                     pm.resolve(err) //找不到資料刪除採resovle回傳
                 }

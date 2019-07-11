@@ -1,5 +1,5 @@
-//import wo from './src/WOrmMongodb.mjs'
-import wo from './dist/w-orm-mongodb.umd.js'
+import wo from './src/WOrmMongodb.mjs'
+//import wo from './dist/w-orm-mongodb.umd.js'
 
 
 let opt = {
@@ -76,7 +76,7 @@ async function main() {
 
 
     //select all
-    let ss = await w.select({})
+    let ss = await w.select()
     console.log('select all', ss)
 
 
