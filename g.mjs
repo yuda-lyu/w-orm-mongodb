@@ -1,5 +1,5 @@
-import wo from './src/WOrmMongodb.mjs'
-//import wo from './dist/w-orm-mongodb.umd.js'
+//import wo from './src/WOrmMongodb.mjs'
+import wo from './dist/w-orm-mongodb.umd.js'
 
 
 let opt = {

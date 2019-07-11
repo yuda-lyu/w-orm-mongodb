@@ -98,7 +98,7 @@ async function main() {
     // => save then [ { n: 1, nModified: 1, ok: 1 },
                       { n: 1, nModified: 1, ok: 1 }, 
                       { n: 0, nModified: 0, ok: 1 }, //autoInsert=false
-                      { n: 1, nInserted: 1, ok: 1 }, //autoInsert=true
+                      { n: 1, nInserted: 1, ok: 1 }  //autoInsert=true
                     ]
 
 
@@ -108,7 +108,8 @@ async function main() {
     // => select all [ { id: 'id-peter', name: 'peter(modify)' },
                        { id: 'id-rosemary', name: 'rosemary(modify)' },
                        { id: 'random id', name: 'kettle' }, //autoInsert=true
-                       { id: 'random id', name: 'kettle(modify)' } ]
+                       { id: 'random id', name: 'kettle(modify)' } 
+                    ]
 
 
     //select
