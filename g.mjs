@@ -66,7 +66,7 @@ async function main() {
 
 
     //save
-    await w.save(rsm)
+    await w.save(rsm, { autoInsert: false, atomic: true })
         .then(function(msg) {
             console.log('save then', msg)
         })
@@ -92,7 +92,7 @@ async function main() {
 
     //del
     let d = ss.filter(function(v) {
-        return v.name === 'kettle(modify)'
+        return v.name === 'kettle'
     })
     w.del(d)
         .then(function(msg) {

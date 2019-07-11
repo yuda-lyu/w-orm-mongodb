@@ -152,8 +152,6 @@ function WOrm(opt) {
         //autoInsert, atomic
         let autoInsert = get(option, 'autoInsert', true)
         let atomic = get(option, 'atomic', false)
-        console.log('autoInsert', autoInsert)
-        console.log('atomic', atomic)
 
         //pm
         let pm = genPm()
@@ -170,13 +168,13 @@ function WOrm(opt) {
             data = [data]
         }
 
-        //oper, for atomic
+        //oper
         let oper = null
         if (atomic) {
-            oper = collection.findOneAndUpdate
+            oper = 'findOneAndUpdate'
         }
         else {
-            oper = collection.updateOne
+            oper = 'updateOne'
         }
 
         //mapSeries
@@ -184,11 +182,18 @@ function WOrm(opt) {
             let pmm = genPm()
 
             //oper
-            oper({ id: v.id }, { $set: v }, function(err, res) {
+            collection[oper]({ id: v.id }, { $set: v }, function(err, res) {
                 if (err) {
                     pmm.reject(err)
                 }
                 else {
+
+                    //lastErrorObject for findOneAndUpdate
+                    if (res.lastErrorObject) {
+                        res.result = res.lastErrorObject
+                    }
+
+                    //autoInsert
                     if (autoInsert && res.result.n === 0) {
                         insert(v)
                             .then(function(res) {
@@ -202,8 +207,8 @@ function WOrm(opt) {
                     else {
                         pmm.resolve(res.result)
                     }
-                }
 
+                }
             })
 
             return pmm
