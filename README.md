@@ -73,7 +73,7 @@ async function main() {
         .catch(function(msg) {
             console.log('delAll catch', msg)
         })
-    // => delAll then { n: 3, ok: 1 }
+    // => delAll then { n: {n}, ok: 1 }
 
 
     //insert
@@ -84,7 +84,7 @@ async function main() {
         .catch(function(msg) {
             console.log('insert catch', msg)
         })
-    // => insert then { ok: 1, n: 3 }
+    // => insert then { n: 3, ok: 1 }
 
 
     //save
@@ -95,9 +95,11 @@ async function main() {
         .catch(function(msg) {
             console.log('save catch', msg)
         })
-    // => save then [ { n: 1, nModified: 1, ok: 1 }, 
+    // => save then [ { n: 1, nModified: 1, ok: 1 },
                       { n: 1, nModified: 1, ok: 1 }, 
-                      { n: 1, nInserted: 1, ok: 1 } ]
+                      { n: 0, nModified: 0, ok: 1 }, //autoInsert=false
+                      { n: 1, nInserted: 1, ok: 1 }, //autoInsert=true
+                    ]
 
 
     //select all
@@ -105,8 +107,8 @@ async function main() {
     console.log('select all', ss)
     // => select all [ { id: 'id-peter', name: 'peter(modify)' },
                        { id: 'id-rosemary', name: 'rosemary(modify)' },
-                       { id: 'PrChECGlTjen1iJKS7Q689RFVLv2k6Tr', name: 'kettle' },
-                       { id: 'kuU13QsWz00DeUksKMYVd9erkLPCrDXM', name: 'kettle(modify)' } ]
+                       { id: 'random id', name: 'kettle' }, //autoInsert=true
+                       { id: 'random id', name: 'kettle(modify)' } ]
 
 
     //select
@@ -122,7 +124,7 @@ async function main() {
 
     //del
     let d = ss.filter(function(v) {
-        return v.name === 'kettle(modify)'
+        return v.name === 'kettle'
     })
     w.del(d)
         .then(function(msg) {
@@ -131,7 +133,7 @@ async function main() {
         .catch(function(msg) {
             console.log('del catch', msg)
         })
-    // => del then [ { n: 1, ok: 1, nDeleted: 1 } ]
+    // => del then [ { n: 1, nDeleted: 1, ok: 1 } ]
     
 
 }

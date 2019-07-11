@@ -190,7 +190,11 @@ function WOrm(opt) {
 
                     //lastErrorObject for findOneAndUpdate
                     if (res.lastErrorObject) {
-                        res.result = res.lastErrorObject
+                        res.result = {
+                            n: res.lastErrorObject.n,
+                            nModified: res.lastErrorObject.updatedExisting ? 1 : 0,
+                            ok: 1,
+                        }
                     }
 
                     //autoInsert
