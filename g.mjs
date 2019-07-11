@@ -1,9 +1,9 @@
-//import w from './src/WOrmMongodb.mjs'
-import wo from './dist/w-orm-mongodb.umd.js'
+import wo from './src/WOrmMongodb.mjs'
+//import wo from './dist/w-orm-mongodb.umd.js'
 
 
 let opt = {
-    url: 'mongodb://semisphere:q1w2e3r4t5y6@127.0.0.1:27017',
+    url: 'mongodb://username:password@127.0.0.1:27017',
     db: 'refs',
     cl: 'users',
 }

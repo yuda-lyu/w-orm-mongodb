@@ -1,6 +1,6 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
@@ -8,14 +8,14 @@
   },
   "devDependencies": {
     "@babel/cli": "^7.4.4",
-    "@babel/core": "^7.4.5",
+    "@babel/core": "^7.5.4",
     "@babel/node": "^7.4.5",
-    "@babel/plugin-proposal-export-default-from": "^7.2.0",
+    "@babel/plugin-proposal-export-default-from": "^7.5.2",
     "@babel/plugin-transform-runtime": "^7.4.4",
     "@babel/polyfill": "^7.4.4",
-    "@babel/preset-env": "^7.4.5",
+    "@babel/preset-env": "^7.5.4",
     "@babel/register": "^7.4.4",
-    "@babel/runtime": "^7.4.5",
+    "@babel/runtime": "^7.5.4",
     "babel-eslint": "^10.0.2",
     "core-js": "^3.1.4",
     "docdash": "^1.1.1",
@@ -29,7 +29,7 @@
     "eslint-plugin-vue": "^5.2.2",
     "gh-pages": "^2.0.1",
     "jsdoc": "^3.6.2",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.14",
     "mocha": "^6.1.4",
     "nodemon": "^1.19.1",
     "rollup-plugin-babel": "^4.3.2",
@@ -43,7 +43,7 @@
     "rollup-plugin-vue": "^5.0.0",
     "rollup-plugin-vue-template-compiler": "^1.0.3",
     "vue-template-compiler": "^2.6.10",
-    "wsemi": "^1.1.14"
+    "wsemi": "^1.1.15"
   },
   "scripts": {
     "test": "mocha --require @babel/register",

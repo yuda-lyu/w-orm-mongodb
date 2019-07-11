@@ -1,5 +1,6 @@
 import mongodb from 'mongodb'
 import cloneDeep from 'lodash/cloneDeep'
+import get from 'lodash/get'
 import map from 'lodash/map'
 import omit from 'lodash/omit'
 import genPm from 'wsemi/src/genPm.mjs'
@@ -138,13 +139,21 @@ function WOrm(opt) {
      *
      * @memberOf WOrm
      * @param {Object|Array} data 輸入數據物件或陣列
-     * @param {boolean} [autoInsert=true] 輸入是否於儲存時發現原本無資料，則自動改以插入處理，預設為true
+     * @param {Object} [option={}] 輸入設定物件，預設為{}
+     * @param {boolean} [option.autoInsert=true] 輸入是否於儲存時發現原本無資料，則自動改以插入處理，預設為true
+     * @param {boolean} [option.atomic=false] 輸入是否於儲存時採用上鎖，避免同時操作互改問題，預設為false
      * @returns {Promise} 回傳Promise，resolve回傳儲存結果，reject回傳錯誤訊息
      */
-    async function save(data, autoInsert = true) {
+    async function save(data, option = {}) {
 
         //cloneDeep
         data = cloneDeep(data)
+
+        //autoInsert, atomic
+        let autoInsert = get(option, 'autoInsert', true)
+        let atomic = get(option, 'atomic', false)
+        console.log('autoInsert', autoInsert)
+        console.log('atomic', atomic)
 
         //pm
         let pm = genPm()
@@ -161,33 +170,41 @@ function WOrm(opt) {
             data = [data]
         }
 
+        //oper, for atomic
+        let oper = null
+        if (atomic) {
+            oper = collection.findOneAndUpdate
+        }
+        else {
+            oper = collection.updateOne
+        }
+
         //mapSeries
         mapSeries(data, function(v) {
             let pmm = genPm()
 
-            //updateOne
-            collection
-                .updateOne({ id: v.id }, { $set: v }, function(err, res) {
-                    if (err) {
-                        pmm.reject(err)
+            //oper
+            oper({ id: v.id }, { $set: v }, function(err, res) {
+                if (err) {
+                    pmm.reject(err)
+                }
+                else {
+                    if (autoInsert && res.result.n === 0) {
+                        insert(v)
+                            .then(function(res) {
+                                res.nInserted = 1
+                                pmm.resolve(res)
+                            })
+                            .catch(function(err) {
+                                pmm.reject(err)
+                            })
                     }
                     else {
-                        if (autoInsert && res.result.n === 0) {
-                            insert(v)
-                                .then(function(res) {
-                                    res.nInserted = 1
-                                    pmm.resolve(res)
-                                })
-                                .catch(function(err) {
-                                    pmm.reject(err)
-                                })
-                        }
-                        else {
-                            pmm.resolve(res.result)
-                        }
+                        pmm.resolve(res.result)
                     }
+                }
 
-                })
+            })
 
             return pmm
         })
