@@ -64,6 +64,7 @@ let rs = _.map(cps, function(v) {
             banner: banner,
             globals: { //指定哪些外部模組的名稱，左邊為內部模組名稱，右邊為外部提供模組名稱
                 'mongodb': 'mongodb',
+                'stream': 'stream',
             },
             format: 'umd',
             name: name,
@@ -72,6 +73,7 @@ let rs = _.map(cps, function(v) {
         },
         external: [ //指定哪些模組需視為外部模組
             'mongodb',
+            'stream',
         ],
         plugins: optPlugins
     }
