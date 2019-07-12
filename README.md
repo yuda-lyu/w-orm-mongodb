@@ -108,8 +108,8 @@ async function test() {
     console.log('select all', ss)
     // => select all [ { id: 'id-peter', name: 'peter(modify)' },
                        { id: 'id-rosemary', name: 'rosemary(modify)' },
-                       { id: 'random id', name: 'kettle' }, //autoInsert=true
-                       { id: 'random id', name: 'kettle(modify)' } 
+                       { id: '{random id}', name: 'kettle' }, //autoInsert=true
+                       { id: '{random id}', name: 'kettle(modify)' } 
                     ]
 
 
@@ -186,7 +186,7 @@ async function test() {
     //insertGfs
     let gi = await w.insertGfs(u8a)
     console.log('insertGfs', gi)
-    // => insertGfs { n: 1, ok: 1, id: 'NWRAIj8nCb4ZTglN9sk7m2B9uv7RJjAO' }
+    // => insertGfs { n: 1, ok: 1, id: '{random id}' }
 
 
     //selectGfs

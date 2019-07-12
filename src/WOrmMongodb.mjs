@@ -311,7 +311,7 @@ function WOrm(opt) {
         let database = client.db(opt.db)
         let collection = database.collection(opt.cl)
 
-        //deleteOne
+        //deleteMany
         collection
             .deleteMany(find, function(err, res) {
                 if (err) {
@@ -329,7 +329,7 @@ function WOrm(opt) {
 
 
     /**
-     * 使用MongoDB GridFS機制，插入數據，需為Uint8Array格式
+     * 使用MongoDB GridFS技術，插入數據，需為Uint8Array格式
      *
      * @memberOf WOrm
      * @param {Uint8Array} u8a
@@ -388,7 +388,7 @@ function WOrm(opt) {
 
 
     /**
-     * 使用MongoDB GridFS機制，查詢數據
+     * 使用MongoDB GridFS技術，查詢數據
      *
      * @memberOf WOrm
      * @param {String} id 輸入查詢id字串
@@ -486,7 +486,7 @@ function WOrm(opt) {
 
 
     /**
-     * 使用MongoDB GridFS機制，刪除數據
+     * 使用MongoDB GridFS技術，刪除數據
      *
      * @memberOf WOrm
      * @param {String} id 輸入刪除id字串
@@ -563,7 +563,7 @@ function WOrm(opt) {
 
 
     /**
-     * 使用MongoDB GridFS機制，刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
+     * 使用MongoDB GridFS技術，刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
      *
      * @memberOf WOrm
      * @param {Object} [find={}] 輸入刪除條件物件
