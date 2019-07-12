@@ -5,7 +5,7 @@ import wo from './src/WOrmMongodb.mjs'
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
     db: 'refs',
-    cl: 'users',
+    cl: 'usersg',
 }
 
 let rs = [
@@ -38,7 +38,7 @@ let rsm = [
     },
 ]
 
-async function main() {
+async function test() {
 
 
     //w
@@ -104,4 +104,4 @@ async function main() {
 
 
 }
-main()
+test()

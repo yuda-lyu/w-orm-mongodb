@@ -1,6 +1,6 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
@@ -43,7 +43,7 @@
     "rollup-plugin-vue": "^5.0.0",
     "rollup-plugin-vue-template-compiler": "^1.0.3",
     "vue-template-compiler": "^2.6.10",
-    "wsemi": "^1.1.15"
+    "wsemi": "^1.1.16"
   },
   "scripts": {
     "test": "mocha --require @babel/register",

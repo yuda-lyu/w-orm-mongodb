@@ -14,11 +14,12 @@ To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-
 
 ## Installation
 ### Using npm(ES6 module):
-> **Note:** `w-orm-mongodb` depends on `mongodb`.
+> **Note:** `w-orm-mongodb` depends on `mongodb` and `stream`.
 ```alias
 npm i w-orm-mongodb
 ```
-## Example
+#### Example for collection
+> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/ga.mjs)]
 ```alias
 import WOrm from 'w-orm-mongodb'
 
@@ -58,7 +59,7 @@ let rsm = [
     },
 ]
 
-async function main() {
+async function test() {
 
 
     //w
@@ -138,5 +139,73 @@ async function main() {
     
 
 }
-main()
+test()
+```
+#### Example for GridFS
+> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/gb.mjs)]
+```alias
+import WOrm from 'w-orm-mongodb'
+
+let opt = {
+    url: 'mongodb://username:password@127.0.0.1:27017',
+    db: 'dbname',
+    cl: 'collname',
+}
+
+async function test() {
+
+
+    //w
+    let w = wo(opt)
+
+
+    //fn_in, fn_out
+    let fn_in = 'data(in).dat'
+    let fn_out = 'data(out).dat'
+
+
+    //u8a, input from file
+    let b = await fs.readFileSync(fn_in)
+    let u8a = new Uint8Array(b)
+    //let u8a = new Uint8Array([66, 97, 115])
+    console.log('u8a', u8a)
+    // => u8a Uint8Array [...]
+
+
+    //delAllGfs
+    await w.delAllGfs()
+        .then(function(msg) {
+            console.log('delAllGfs then', msg)
+        })
+        .catch(function(msg) {
+            console.log('delAllGfs catch', msg)
+        })
+    // => delAllGfs then { n: 0, ok: 1 }
+
+
+    //insertGfs
+    let gi = await w.insertGfs(u8a)
+    console.log('insertGfs', gi)
+    // => insertGfs { n: 1, ok: 1, id: 'NWRAIj8nCb4ZTglN9sk7m2B9uv7RJjAO' }
+
+
+    //selectGfs
+    let gs = await w.selectGfs(gi.id)
+    console.log('selectGfs', gs)
+    // => selectGfs Uint8Array [...]
+
+
+    //output
+    fs.writeFileSync(fn_out, gs)
+
+
+    //delGfs
+    let gd = await w.delGfs(gi.id)
+    console.log('delGfs', gd)
+    // => delGfs { n: 1, nDeleted: 1, ok: 1 }
+
+
+}
+test()
+
 ```
