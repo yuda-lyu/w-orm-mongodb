@@ -21,7 +21,7 @@ npm i w-orm-mongodb
 #### Example for collection
 > **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/ga.mjs)]
 ```alias
-import WOrm from 'w-orm-mongodb'
+import wo from 'w-orm-mongodb'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
@@ -144,7 +144,7 @@ test()
 #### Example for GridFS
 > **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/gb.mjs)]
 ```alias
-import WOrm from 'w-orm-mongodb'
+import wo from 'w-orm-mongodb'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
