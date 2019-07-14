@@ -59,7 +59,7 @@
 
     
 
-    <h4 class="name" id="WOrm"><span class="type-signature"></span>new WOrm<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="WOrm"><span class="type-signature"></span>new WOrm<span class="signature">(opt<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Object}</span></h4>
 
     
 
@@ -71,7 +71,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line13">line 13</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line23">line 23</a>
     </li></ul></dd>
     
 
@@ -110,6 +110,234 @@
 
 
 
+<div class="description">
+    <p>操作資料庫(MongoDB)</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>opt</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>{}</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入設定物件，預設{}</p>
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>url</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'mongodb://127.0.0.1:27017'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入連接資料庫字串，預設'mongodb://127.0.0.1:27017'</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>db</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'worm'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入使用資料庫名稱字串，預設'worm'</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>cl</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'test'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入使用資料表名稱字串，預設'test'</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -126,14 +354,28 @@
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>回傳操作資料庫物件，各事件功能詳見說明</p>
+</div>
 
 
 
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
 
 
+    </dd>
+</dl>
 
-
-
+    
 
 
 
@@ -175,7 +417,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line242">line 242</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line247">line 247</a>
     </li></ul></dd>
     
 
@@ -336,7 +578,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line302">line 302</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line307">line 307</a>
     </li></ul></dd>
     
 
@@ -514,7 +756,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line572">line 572</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line577">line 577</a>
     </li></ul></dd>
     
 
@@ -692,7 +934,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line495">line 495</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line500">line 500</a>
     </li></ul></dd>
     
 
@@ -850,7 +1092,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line86">line 86</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line91">line 91</a>
     </li></ul></dd>
     
 
@@ -1011,7 +1253,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line338">line 338</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line343">line 343</a>
     </li></ul></dd>
     
 
@@ -1169,7 +1411,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line148">line 148</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line153">line 153</a>
     </li></ul></dd>
     
 
@@ -1493,7 +1735,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line44">line 44</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line49">line 49</a>
     </li></ul></dd>
     
 
@@ -1671,7 +1913,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line397">line 397</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line402">line 402</a>
     </li></ul></dd>
     
 
@@ -1832,7 +2074,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.2</a> on Fri Jul 12 2019 17:11:02 GMT+0800 (GMT+08:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.2</a> on Sun Jul 14 2019 17:19:15 GMT+0800 (GMT+08:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
