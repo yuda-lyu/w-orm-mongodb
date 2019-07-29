@@ -7,7 +7,7 @@ import omit from 'lodash/omit'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
-import mapSeries from 'wsemi/src/mapSeries.mjs'
+import pmSeries from 'wsemi/src/pmSeries.mjs'
 
 
 /**
@@ -183,8 +183,8 @@ function WOrm(opt = {}) {
             oper = 'updateOne'
         }
 
-        //mapSeries
-        mapSeries(data, function(v) {
+        //pmSeries
+        pmSeries(data, function(v) {
             let pmm = genPm()
 
             //oper
@@ -264,8 +264,8 @@ function WOrm(opt = {}) {
             data = [data]
         }
 
-        //mapSeries
-        mapSeries(data, function(v) {
+        //pmSeries
+        pmSeries(data, function(v) {
             let pmm = genPm()
 
             //deleteOne

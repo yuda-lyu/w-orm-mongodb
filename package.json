@@ -1,6 +1,6 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
@@ -19,18 +19,18 @@
     "babel-eslint": "^10.0.2",
     "core-js": "^3.1.4",
     "docdash": "^1.1.1",
-    "eslint": "^6.0.1",
+    "eslint": "^6.1.0",
     "eslint-config-standard": "^13.0.1",
     "eslint-friendly-formatter": "^4.0.1",
-    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-node": "^9.1.0",
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.0",
     "eslint-plugin-vue": "^5.2.3",
     "gh-pages": "^2.0.1",
     "jsdoc": "^3.6.3",
-    "lodash": "^4.17.14",
-    "mocha": "^6.1.4",
+    "lodash": "^4.17.15",
+    "mocha": "^6.2.0",
     "nodemon": "^1.19.1",
     "rollup": "^1.17.0",
     "rollup-plugin-babel": "^4.3.3",
@@ -43,7 +43,7 @@
     "rollup-plugin-vue": "^5.0.1",
     "rollup-plugin-vue-template-compiler": "^1.0.3",
     "vue-template-compiler": "^2.6.10",
-    "wsemi": "^1.1.17"
+    "wsemi": "^1.2.2"
   },
   "scripts": {
     "test": "mocha --require @babel/register",

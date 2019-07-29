@@ -5,8 +5,8 @@ import fs from 'fs'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
-    db: 'refs',
-    cl: 'usersg',
+    db: 'worm',
+    cl: 'usersGfs',
 }
 
 async function test() {
@@ -17,8 +17,8 @@ async function test() {
 
 
     //fn_in, fn_out
-    let fn_in = 'data(in).dat'
-    let fn_out = 'data(out).dat'
+    let fn_in = 'D:\\開源-Javascript-w-orm-mongodb\\data(in).dat'
+    let fn_out = 'D:\\開源-Javascript-w-orm-mongodb\\data(out).dat'
 
 
     //u8a

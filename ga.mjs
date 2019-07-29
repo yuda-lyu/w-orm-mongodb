@@ -4,8 +4,8 @@ import wo from './src/WOrmMongodb.mjs'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
-    db: 'refs',
-    cl: 'usersg',
+    db: 'worm',
+    cl: 'users',
 }
 
 let rs = [
