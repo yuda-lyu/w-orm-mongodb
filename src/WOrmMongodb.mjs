@@ -10,6 +10,13 @@ import isarr from 'wsemi/src/isarr.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
 
 
+//optMGConn
+let optMGConn = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}
+
+
 /**
  * 操作資料庫(MongoDB)
  *
@@ -52,7 +59,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -97,7 +104,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -163,7 +170,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -253,7 +260,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -310,7 +317,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -352,7 +359,7 @@ function WOrm(opt = {}) {
         let buf = Buffer.from(u8a)
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -405,7 +412,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -462,7 +469,7 @@ function WOrm(opt = {}) {
         if (bucket === null) {
 
             //client
-            let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+            let client = await MongoClient.connect(opt.url, optMGConn)
 
             //database, collection
             let database = client.db(opt.db)
@@ -503,7 +510,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
@@ -580,7 +587,7 @@ function WOrm(opt = {}) {
         let pm = genPm()
 
         //client
-        let client = await MongoClient.connect(opt.url, { useNewUrlParser: true })
+        let client = await MongoClient.connect(opt.url, optMGConn)
 
         //database, collection
         let database = client.db(opt.db)
