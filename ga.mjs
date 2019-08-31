@@ -81,20 +81,20 @@ async function test() {
 
 
     //select
-    w.select({ id: 'id-rosemary' })
-        .then(function(msg) {
-            console.log('select then', msg)
-        })
-        .catch(function(msg) {
-            console.log('select catch', msg)
-        })
+    let so = await w.select({ id: 'id-rosemary' })
+    console.log('select', so)
+
+
+    //select by regex
+    let sr = await w.select({ name: { $regex: 'MoD', $options: '$i' } })
+    console.log('selectReg', sr)
 
 
     //del
     let d = ss.filter(function(v) {
         return v.name === 'kettle'
     })
-    w.del(d)
+    await w.del(d)
         .then(function(msg) {
             console.log('del then', msg)
         })

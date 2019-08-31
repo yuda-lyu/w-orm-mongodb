@@ -67,7 +67,7 @@ function WOrm(opt = {}) {
 
         //find
         collection
-            .find(find)
+            .find(find) //find第二參數為option, 可放sort或limit等
             //.sort({ $natural: -1 })
             //.limit(N)
             .toArray(function(err, res) {

@@ -39,7 +39,6 @@ let optPlugins = [
         browser: true,
     }),
     babel(optBabel),
-    //buble(),
     postcss({
         extensions: ['.css']
     }),
@@ -61,7 +60,7 @@ let rs = _.map(cps, function(v) {
         input: input,
         output: {
             banner: banner,
-            globals: { //指定哪些外部模組的名稱，左邊為內部模組名稱，右邊為外部提供模組名稱
+            globals: { //指定內外模組的關聯性，左邊為內部使用之模組名稱，右邊為外部提供之模組名稱
                 'mongodb': 'mongodb',
                 'stream': 'stream',
             },
@@ -70,7 +69,7 @@ let rs = _.map(cps, function(v) {
             file: file,
             sourcemap: true
         },
-        external: [ //指定哪些模組需視為外部模組
+        external: [ //指定哪些內部模組需引用外部模組
             'mongodb',
             'stream',
         ],

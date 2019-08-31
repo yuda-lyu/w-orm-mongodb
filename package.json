@@ -4,7 +4,8 @@
   "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
-    "mongodb": "^3.3.1"
+    "mongodb": "^3.3.1",
+    "saslprep": "^1.0.3"
   },
   "devDependencies": {
     "@babel/cli": "^7.5.5",
@@ -46,7 +47,7 @@
     "wsemi": "^1.2.25"
   },
   "scripts": {
-    "test": "mocha --require @babel/register",
+    "test": "./node_modules/.bin/mocha --require @babel/register",
     "deploy": "gh-pages -d docs"
   },
   "repository": {
