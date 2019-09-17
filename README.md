@@ -117,14 +117,13 @@ async function test() {
 
 
     //select
-    w.select({ id: 'id-rosemary' })
-        .then(function(msg) {
-            console.log('select then', msg)
-        })
-        .catch(function(msg) {
-            console.log('select catch', msg)
-        })
-    // => select then [ { id: 'id-rosemary', name: 'rosemary(modify)' } ]
+    let so = await w.select({ id: 'id-rosemary' })
+    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)' } ]
+
+
+    //select by regex
+    let sr = await w.select({ name: { $regex: 'MoD', $options: '$i' } })
+    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)' } ]
 
 
     //del
