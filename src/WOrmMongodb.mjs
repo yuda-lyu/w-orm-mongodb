@@ -1,9 +1,11 @@
+import events from 'events'
 import mongodb from 'mongodb'
 import stream from 'stream'
 import cloneDeep from 'lodash/cloneDeep'
 import get from 'lodash/get'
 import map from 'lodash/map'
 import omit from 'lodash/omit'
+import size from 'lodash/size'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
@@ -27,7 +29,7 @@ let optMGConn = {
  * @param {String} [opt.cl='test'] 輸入使用資料表名稱字串，預設'test'
  * @returns {Object} 回傳操作資料庫物件，各事件功能詳見說明
  */
-function WOrm(opt = {}) {
+function WOrmMongodb(opt = {}) {
 
 
     //default
@@ -42,6 +44,10 @@ function WOrm(opt = {}) {
     }
 
 
+    //ee
+    let ee = new events.EventEmitter()
+
+
     //MongoClient
     let MongoClient = mongodb.MongoClient
 
@@ -49,7 +55,7 @@ function WOrm(opt = {}) {
     /**
      * 查詢數據
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Object} [find={}] 輸入查詢條件物件
      * @returns {Promise} 回傳Promise，resolve回傳數據，reject回傳錯誤訊息
      */
@@ -91,7 +97,7 @@ function WOrm(opt = {}) {
     /**
      * 插入數據，插入同樣數據會自動產生不同_id，故insert前需自行判斷有無重複
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
      * @returns {Promise} 回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息
      */
@@ -133,7 +139,9 @@ function WOrm(opt = {}) {
 
                     //check
                     if (res.insertedCount > 0) {
-                        pm.resolve(res.result)
+                        res = res.result
+                        pm.resolve(res)
+                        ee.emit('change', 'insert', data, res)
                     }
                     else {
                         pm.reject(err)
@@ -150,7 +158,7 @@ function WOrm(opt = {}) {
     /**
      * 儲存數據
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
      * @param {Object} [option={}] 輸入設定物件，預設為{}
      * @param {boolean} [option.autoInsert=true] 輸入是否於儲存時發現原本無數據，則自動改以插入處理，預設為true
@@ -232,6 +240,7 @@ function WOrm(opt = {}) {
         })
             .then(function(msg) {
                 pm.resolve(msg)
+                ee.emit('change', 'save', data, msg)
             })
             .catch(function(msg) {
                 pm.reject(msg)
@@ -247,7 +256,7 @@ function WOrm(opt = {}) {
     /**
      * 刪除數據
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
@@ -292,6 +301,7 @@ function WOrm(opt = {}) {
         })
             .then(function(msg) {
                 pm.resolve(msg)
+                ee.emit('change', 'del', data, msg)
             })
             .catch(function(msg) {
                 pm.reject(msg)
@@ -307,7 +317,7 @@ function WOrm(opt = {}) {
     /**
      * 刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Object} [find={}] 輸入刪除條件物件
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
@@ -332,6 +342,7 @@ function WOrm(opt = {}) {
                 else {
                     res = res.result
                     pm.resolve(res)
+                    ee.emit('change', 'delAll', null, res)
                 }
                 client.close()
             })
@@ -343,7 +354,7 @@ function WOrm(opt = {}) {
     /**
      * 使用GridFS，插入數據，需為Uint8Array格式
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Uint8Array} u8a
      * @returns {Promise} 回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息
      */
@@ -386,9 +397,13 @@ function WOrm(opt = {}) {
 
             })
             .on('finish', function() {
+                let res = { n: 1, ok: 1, id: id }
 
                 //resolve
-                pm.resolve({ n: 1, ok: 1, id: id })
+                pm.resolve(res)
+
+                //emit
+                ee.emit('change', 'insertGfs', null, res)
 
                 //close
                 client.close()
@@ -402,7 +417,7 @@ function WOrm(opt = {}) {
     /**
      * 使用GridFS，查詢數據
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {String} id 輸入查詢id字串
      * @returns {Promise} 回傳Promise，resolve回傳數據，reject回傳錯誤訊息
      */
@@ -500,7 +515,7 @@ function WOrm(opt = {}) {
     /**
      * 使用GridFS，刪除數據
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {String} id 輸入刪除id字串
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
@@ -544,7 +559,14 @@ function WOrm(opt = {}) {
                     pm.reject(err)
                 }
                 else {
-                    pm.resolve({ n: 1, nDeleted: 1, ok: 1 })
+                    let res = { n: 1, nDeleted: 1, ok: 1 }
+
+                    //resolve
+                    pm.resolve(res)
+
+                    //emit
+                    ee.emit('change', 'delGfs', null, res)
+
                 }
                 client.close()
             })
@@ -577,7 +599,7 @@ function WOrm(opt = {}) {
     /**
      * 使用GridFS，刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
      *
-     * @memberOf WOrm
+     * @memberOf WOrmMongodb
      * @param {Object} [find={}] 輸入刪除條件物件
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
@@ -601,6 +623,9 @@ function WOrm(opt = {}) {
         //_findGfs
         let res = await _findGfs(find, bucket)
 
+        //n
+        let n = size(res)
+
         //ps
         let ps = map(res, function(v) {
             let bid = v._id
@@ -610,7 +635,14 @@ function WOrm(opt = {}) {
         //all
         Promise.all(ps)
             .then(function(msg) {
-                pm.resolve({ n: res.length, ok: 1 })
+                let res = { n, ok: 1 }
+
+                //resolve
+                pm.resolve(res)
+
+                //emit
+                ee.emit('change', 'delAllGfs', null, res)
+
             })
             .catch(function(msg) {
                 pm.reject(msg)
@@ -623,18 +655,20 @@ function WOrm(opt = {}) {
     }
 
 
-    return {
-        select,
-        insert,
-        save,
-        del,
-        delAll,
-        selectGfs,
-        insertGfs,
-        delGfs,
-        delAllGfs,
-    }
+    //bind
+    ee.select = select
+    ee.insert = insert
+    ee.save = save
+    ee.del = del
+    ee.delAll = delAll
+    ee.selectGfs = selectGfs
+    ee.insertGfs = insertGfs
+    ee.delGfs = delGfs
+    ee.delAllGfs = delAllGfs
+
+
+    return ee
 }
 
 
-export default WOrm
+export default WOrmMongodb

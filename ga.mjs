@@ -11,15 +11,18 @@ let opt = {
 let rs = [
     {
         id: 'id-peter',
-        name: 'peter'
+        name: 'peter',
+        value: 123,
     },
     {
         id: 'id-rosemary',
-        name: 'rosemary'
+        name: 'rosemary',
+        value: 123.456,
     },
     {
         id: '',
-        name: 'kettle'
+        name: 'kettle',
+        value: 456,
     },
 ]
 
@@ -43,6 +46,12 @@ async function test() {
 
     //w
     let w = wo(opt)
+
+
+    //on
+    w.on('change', function(mode, data, res) {
+        console.log('change', mode)
+    })
 
 
     //delAll
@@ -85,8 +94,23 @@ async function test() {
     console.log('select', so)
 
 
+    //select by $and, $gt, $lt
+    let spa = await w.select({ '$and': [{ value: { '$gt': 123 } }, { value: { '$lt': 200 } }] })
+    console.log('select by $and, $gt, $lt', spa)
+
+
+    //select by $or, $gte, $lte
+    let spb = await w.select({ '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 200 } }] })
+    console.log('select by $or, $gte, $lte', spb)
+
+
+    //select by $and, $ne, $in, $nin
+    let spc = await w.select({ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] })
+    console.log('select by $and, $ne, $in, $nin', spc)
+
+
     //select by regex
-    let sr = await w.select({ name: { $regex: 'MoD', $options: '$i' } })
+    let sr = await w.select({ name: { $regex: 'PeT', $options: '$i' } })
     console.log('selectReg', sr)
 
 

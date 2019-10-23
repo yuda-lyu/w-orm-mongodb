@@ -16,9 +16,15 @@ async function test() {
     let w = wo(opt)
 
 
+    //on
+    w.on('change', function(mode, data, res) {
+        console.log('change', mode)
+    })
+
+
     //fn_in, fn_out
-    let fn_in = 'D:\\開源-Javascript-w-orm-mongodb\\data(in).dat'
-    let fn_out = 'D:\\開源-Javascript-w-orm-mongodb\\data(out).dat'
+    let fn_in = 'D:\\開源-JS-003-2-w-orm-mongodb\\data(in).dat'
+    let fn_out = 'D:\\開源-JS-003-2-w-orm-mongodb\\data(out).dat'
 
 
     //u8a

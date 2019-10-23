@@ -12,12 +12,14 @@ rollupFiles({
     fdTar,
     nameDistType: 'kebabCase',
     globals: {
-        'mongodb': 'mongodb',
+        'events': 'events',
         'stream': 'stream',
+        'mongodb': 'mongodb',
     },
     external: [
-        'mongodb',
+        'events',
         'stream',
+        'mongodb',
     ],
 })
 

@@ -14,7 +14,7 @@ To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-
 
 ## Installation
 ### Using npm(ES6 module):
-> **Note:** `w-orm-mongodb` depends on `mongodb`, `stream` and `saslprep`.
+> **Note:** `w-orm-mongodb` depends on `mongodb`, `saslprep`, `events` and `stream`.
 
 > **Note:** `saslprep` is used by `mongodb` for checking user's password.
 
@@ -69,6 +69,12 @@ async function test() {
     let w = wo(opt)
 
 
+    //on
+    w.on('change', function(mode, data, res) {
+        console.log('change', mode)
+    })
+
+
     //delAll
     await w.delAll()
         .then(function(msg) {
@@ -107,23 +113,38 @@ async function test() {
 
 
     //select all
-    let ss = await w.select({})
+    let ss = await w.select()
     console.log('select all', ss)
-    // => select all [ { id: 'id-peter', name: 'peter(modify)' },
-                       { id: 'id-rosemary', name: 'rosemary(modify)' },
-                       { id: '{random id}', name: 'kettle' }, //autoInsert=true
-                       { id: '{random id}', name: 'kettle(modify)' } 
+    // => select all [ { id: 'id-peter', name: 'peter(modify)', value: 123 },
+                       { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
+                       { id: '{random id}', name: 'kettle', value: 456 },
+                       { id: '{random id}', name: 'kettle(modify)' } //autoInsert=true
                     ]
 
 
     //select
     let so = await w.select({ id: 'id-rosemary' })
-    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)' } ]
+    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 } ]
+
+
+    //select by $and, $gt, $lt
+    let spa = await w.select({ '$and': [{ value: { '$gt': 123 } }, { value: { '$lt': 200 } }] })
+    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 } ]
+
+
+    //select by $or, $gte, $lte
+    let spb = await w.select({ '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 200 } }] })
+    // => select [ { id: '{random id}', name: 'kettle', value: 456 } ]
+
+
+    //select by $and, $ne, $in, $nin
+    let spc = await w.select({ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] })
+    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 } ]
 
 
     //select by regex
-    let sr = await w.select({ name: { $regex: 'MoD', $options: '$i' } })
-    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)' } ]
+    let sr = await w.select({ name: { $regex: 'PeT', $options: '$i' } })
+    // => select [ { id: 'id-peter', name: 'peter(modify)', value: 123 } ]
 
 
     //del
@@ -209,5 +230,4 @@ async function test() {
 
 }
 test()
-
 ```
