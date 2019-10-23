@@ -28,8 +28,8 @@ import wo from 'w-orm-mongodb'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
-    db: 'dbname',
-    cl: 'collname',
+    db: 'worm',
+    cl: 'users',
 }
 
 let rs = [
@@ -171,8 +171,8 @@ import wo from 'w-orm-mongodb'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
-    db: 'dbname',
-    cl: 'collname',
+    db: 'worm',
+    cl: 'usersGfs',
 }
 
 async function test() {
