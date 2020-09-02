@@ -1,16 +1,16 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.1.18",
+  "version": "1.1.19",
   "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
-    "mongodb": "^3.5.8",
+    "mongodb": "^3.6.0",
     "saslprep": "^1.0.3",
-    "lodash": "^4.17.15",
-    "wsemi": "^1.4.41"
+    "lodash": "^4.17.20",
+    "wsemi": "^1.5.11"
   },
   "devDependencies": {
-    "w-package-tools": "^1.0.25"
+    "w-package-tools": "^1.0.28"
   },
   "scripts": {
     "test": "./node_modules/.bin/mocha --require @babel/register",
