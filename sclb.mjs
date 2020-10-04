@@ -23,8 +23,8 @@ async function test() {
 
 
     //fn_in, fn_out
-    let fn_in = 'D:\\開源-JS-003-2-w-orm-mongodb\\data(in).dat'
-    let fn_out = 'D:\\開源-JS-003-2-w-orm-mongodb\\data(out).dat'
+    let fn_in = 'D:\\開源-JS-004-2-w-orm-mongodb\\data(in).dat'
+    let fn_out = 'D:\\開源-JS-004-2-w-orm-mongodb\\data(out).dat'
 
 
     //u8a
