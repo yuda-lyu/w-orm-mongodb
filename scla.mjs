@@ -104,9 +104,9 @@ async function test() {
     console.log('select by $or, $gte, $lte', spb)
 
 
-    //select by $and, $ne, $in, $nin
-    let spc = await w.select({ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] })
-    console.log('select by $and, $ne, $in, $nin', spc)
+    //select by $or, $and, $ne, $in, $nin
+    let spc = await w.select({ '$or': [{ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] }, { '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 400 } }] }] })
+    console.log('select by $or, $and, $ne, $in, $nin', spc)
 
 
     //select by regex
@@ -129,3 +129,44 @@ async function test() {
 
 }
 test()
+// change delAll
+// delAll then { n: 0, ok: 1 }
+// change insert
+// insert then { ok: 1, n: 3 }
+// change save
+// save then [
+//   { n: 1, nModified: 1, ok: 1 },
+//   { n: 1, nModified: 1, ok: 1 },
+//   { n: 0, nModified: 0, ok: 1 }
+// ]
+// select all [
+//   { id: 'id-peter', name: 'peter(modify)', value: 123 },
+//   { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
+//   {
+//     id: {random id},
+//     name: 'kettle',
+//     value: 456
+//   }
+// ]
+// select [ { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 } ]
+// select by $and, $gt, $lt [ { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 } ]
+// select by $or, $gte, $lte [
+//   {
+//     id: {random id},
+//     name: 'kettle',
+//     value: 456
+//   }
+// ]
+// select by $or, $and, $ne, $in, $nin [
+//   { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
+//   {
+//     id: {random id},
+//     name: 'kettle',
+//     value: 456
+//   }
+// ]
+// selectReg [ { id: 'id-peter', name: 'peter(modify)', value: 123 } ]
+// change del
+// del then [ { n: 1, ok: 1, nDeleted: 1 } ]
+
+//node --experimental-modules --es-module-specifier-resolution=node scla.mjs

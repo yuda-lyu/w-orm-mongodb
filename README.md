@@ -105,21 +105,23 @@ async function test() {
         .catch(function(msg) {
             console.log('save catch', msg)
         })
-    // => save then [ { n: 1, nModified: 1, ok: 1 },
-                      { n: 1, nModified: 1, ok: 1 }, 
-                      { n: 0, nModified: 0, ok: 1 }, //autoInsert=false
-                      { n: 1, nInserted: 1, ok: 1 }  //autoInsert=true
-                    ]
+    // => save then [ 
+    //                { n: 1, nModified: 1, ok: 1 },
+    //                { n: 1, nModified: 1, ok: 1 }, 
+    //                { n: 0, nModified: 0, ok: 1 }, //autoInsert=false
+    //                { n: 1, nInserted: 1, ok: 1 }  //autoInsert=true
+    //              ]
 
 
     //select all
     let ss = await w.select()
     console.log('select all', ss)
-    // => select all [ { id: 'id-peter', name: 'peter(modify)', value: 123 },
-                       { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
-                       { id: '{random id}', name: 'kettle', value: 456 },
-                       { id: '{random id}', name: 'kettle(modify)' } //autoInsert=true
-                    ]
+    // => select all [ 
+    //                 { id: 'id-peter', name: 'peter(modify)', value: 123 },
+    //                 { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
+    //                 { id: '{random id}', name: 'kettle', value: 456 },
+    //                 { id: '{random id}', name: 'kettle(modify)' } //autoInsert=true
+    //               ]
 
 
     //select
@@ -137,9 +139,13 @@ async function test() {
     // => select [ { id: '{random id}', name: 'kettle', value: 456 } ]
 
 
-    //select by $and, $ne, $in, $nin
-    let spc = await w.select({ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] })
-    // => select [ { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 } ]
+    //select by $or, $and, $ne, $in, $nin
+    let spc = await w.select({ '$or': [{ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] }, { '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 400 } }] }] })
+    console.log('select by $or, $and, $ne, $in, $nin', spc)
+    // => select [
+    //             { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
+    //             { id: '{random id}', name: 'kettle', value: 456 }
+    //           ]
 
 
     //select by regex
