@@ -4,16 +4,16 @@
   "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
-    "mongodb": "^3.6.3",
+    "mongodb": "^3.6.6",
     "saslprep": "^1.0.3",
-    "lodash": "^4.17.20",
-    "wsemi": "^1.5.40"
+    "lodash": "^4.17.21",
+    "wsemi": "^1.5.77"
   },
   "devDependencies": {
-    "w-package-tools": "^1.0.30"
+    "w-package-tools": "^1.0.54"
   },
   "scripts": {
-    "test": "./node_modules/.bin/mocha --require @babel/register",
+    "test": "mocha --parallel --timeout 60000 --experimental-modules --es-module-specifier-resolution=node",
     "deploy": "gh-pages -d docs"
   },
   "repository": {

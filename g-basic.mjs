@@ -169,4 +169,4 @@ test()
 // change del
 // del then [ { n: 1, ok: 1, nDeleted: 1 } ]
 
-//node --experimental-modules --es-module-specifier-resolution=node scla.mjs
+//node --experimental-modules --es-module-specifier-resolution=node g-basic.mjs

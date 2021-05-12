@@ -14,7 +14,7 @@ To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-
 
 ## Installation
 ### Using npm(ES6 module):
-> **Note:** `w-orm-mongodb` depends on `mongodb`, `saslprep`, `events` and `stream`.
+> **Note:** `w-orm-mongodb` is mainly dependent on `mongodb`, `saslprep`, `events` and `stream`.
 
 > **Note:** `saslprep` is used by `mongodb` for checking user's password.
 

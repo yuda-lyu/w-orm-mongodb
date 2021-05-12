@@ -1,6 +1,7 @@
+import path from 'path'
+import fs from 'fs'
 import wo from './src/WOrmMongodb.mjs'
 //import wo from './dist/w-orm-mongodb.umd.js'
-import fs from 'fs'
 
 
 let opt = {
@@ -23,8 +24,12 @@ async function test() {
 
 
     //fn_in, fn_out
-    let fn_in = 'D:\\開源-JS-004-2-w-orm-mongodb\\data(in).dat'
-    let fn_out = 'D:\\開源-JS-004-2-w-orm-mongodb\\data(out).dat'
+    let fn_in = path.resolve('../','./_data','data(in).dat')
+    let fn_out = path.resolve('../','./_data','data(out).dat')
+
+
+    //unlinkSync
+    fs.unlinkSync(fn_out)
 
 
     //u8a
@@ -93,4 +98,4 @@ test()
 // change delGfs
 // delGfs { n: 1, nDeleted: 1, ok: 1 }
 
-//node --experimental-modules --es-module-specifier-resolution=node sclb.mjs
+//node --experimental-modules --es-module-specifier-resolution=node g-gfs.mjs
