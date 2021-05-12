@@ -22,7 +22,7 @@ To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-
 npm i w-orm-mongodb
 ```
 #### Example for collection
-> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/ga.mjs)]
+> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-basic.mjs)]
 ```alias
 import wo from 'w-orm-mongodb'
 
@@ -171,7 +171,7 @@ async function test() {
 test()
 ```
 #### Example for GridFS
-> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/gb.mjs)]
+> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-gfs.mjs)]
 ```alias
 import wo from 'w-orm-mongodb'
 
