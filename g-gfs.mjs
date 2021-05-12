@@ -24,8 +24,8 @@ async function test() {
 
 
     //fn_in, fn_out
-    let fn_in = path.resolve('../','./_data','data(in).dat')
-    let fn_out = path.resolve('../','./_data','data(out).dat')
+    let fn_in = path.resolve('../', './_data', 'data(in).dat')
+    let fn_out = path.resolve('../', './_data', 'data(out).dat')
 
 
     //unlinkSync
