@@ -139,7 +139,11 @@ function WOrmMongodb(opt = {}) {
 
                     //check
                     if (res.insertedCount > 0) {
-                        res = res.result
+                        res = {
+                            n: size(data),
+                            nInserted: res.insertedCount,
+                            ok: res.acknowledged ? 1 : 0,
+                        }
                         pm.resolve(res)
                         ee.emit('change', 'insert', data, res)
                     }
@@ -199,11 +203,12 @@ function WOrmMongodb(opt = {}) {
         }
 
         //pmSeries
-        pmSeries(data, function(v) {
+        pmSeries(data, async(v) => {
             let pmm = genPm()
 
             //oper
             collection[oper]({ id: v.id }, { $set: v }, function(err, res) {
+                // console.log(oper, 'res', res)
                 if (err) {
                     pmm.reject(err)
                 }
@@ -211,18 +216,39 @@ function WOrmMongodb(opt = {}) {
 
                     //lastErrorObject for findOneAndUpdate
                     if (res.lastErrorObject) {
-                        res.result = {
+                        // console.log('res.lastErrorObject', res.lastErrorObject)
+                        res = {
+                            // lastErrorObject: { n: 1, updatedExisting: true },
+                            // value: {
+                            //   _id: new ObjectId("615c18bb6e5db9935b10d88e"),
+                            //   id: 'id-rosemary',
+                            //   name: 'rosemary',
+                            //   value: 123.456
+                            // },
+                            // ok: 1
                             n: res.lastErrorObject.n,
                             nModified: res.lastErrorObject.updatedExisting ? 1 : 0,
                             ok: 1,
                         }
                     }
+                    else {
+                        res = {
+                            // acknowledged: true,
+                            // modifiedCount: 1,
+                            // upsertedId: null,
+                            // upsertedCount: 0,
+                            // matchedCount: 1
+                            n: res.matchedCount,
+                            nModified: res.modifiedCount,
+                            ok: res.acknowledged ? 1 : 0,
+                        }
+                    }
+                    // console.log('res', res)
 
                     //autoInsert
-                    if (autoInsert && res.result.n === 0) {
+                    if (autoInsert && res.n === 0) {
                         insert(v)
                             .then(function(res) {
-                                res.nInserted = 1
                                 pmm.resolve(res)
                             })
                             .catch(function(err) {
@@ -230,7 +256,7 @@ function WOrmMongodb(opt = {}) {
                             })
                     }
                     else {
-                        pmm.resolve(res.result)
+                        pmm.resolve(res)
                     }
 
                 }
@@ -291,8 +317,11 @@ function WOrmMongodb(opt = {}) {
                         pmm.resolve(err) //找不到數據刪除採resovle回傳
                     }
                     else {
-                        res = res.result
-                        res.nDeleted = 1
+                        res = {
+                            n: res.deletedCount,
+                            nDeleted: res.deletedCount,
+                            ok: res.acknowledged ? 1 : 0,
+                        }
                         pmm.resolve(res)
                     }
                 })
@@ -340,7 +369,11 @@ function WOrmMongodb(opt = {}) {
                     pm.resolve(err) //找不到數據刪除採resovle回傳
                 }
                 else {
-                    res = res.result
+                    res = {
+                        n: res.deletedCount,
+                        nDeleted: res.deletedCount,
+                        ok: res.acknowledged ? 1 : 0,
+                    }
                     pm.resolve(res)
                     ee.emit('change', 'delAll', null, res)
                 }
@@ -559,7 +592,11 @@ function WOrmMongodb(opt = {}) {
                     pm.reject(err)
                 }
                 else {
-                    let res = { n: 1, nDeleted: 1, ok: 1 }
+                    let res = {
+                        n: 1,
+                        nDeleted: 1,
+                        ok: 1,
+                    }
 
                     //resolve
                     pm.resolve(res)
@@ -588,7 +625,11 @@ function WOrmMongodb(opt = {}) {
                 pm.reject(err)
             }
             else {
-                pm.resolve({ n: 1, nDeleted: 1, ok: 1 })
+                pm.resolve({
+                    n: 1,
+                    nDeleted: 1,
+                    ok: 1,
+                })
             }
         })
 

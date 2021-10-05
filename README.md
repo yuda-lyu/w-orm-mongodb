@@ -83,7 +83,7 @@ async function test() {
         .catch(function(msg) {
             console.log('delAll catch', msg)
         })
-    // => delAll then { n: {n}, ok: 1 }
+    // => delAll then { n: 2, nDeleted: 2, ok: 1 }
 
 
     //insert
@@ -94,7 +94,7 @@ async function test() {
         .catch(function(msg) {
             console.log('insert catch', msg)
         })
-    // => insert then { n: 3, ok: 1 }
+    // => insert then { n: 3, nInserted: 3, ok: 1 }
 
 
     //save
