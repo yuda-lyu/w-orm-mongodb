@@ -3,7 +3,6 @@ An object of operator for mongodb in nodejs, like a simple ORM.
 
 ![language](https://img.shields.io/badge/language-JavaScript-orange.svg) 
 [![npm version](http://img.shields.io/npm/v/w-orm-mongodb.svg?style=flat)](https://npmjs.org/package/w-orm-mongodb) 
-[![Build Status](https://travis-ci.org/yuda-lyu/w-orm-mongodb.svg?branch=master)](https://travis-ci.org/yuda-lyu/w-orm-mongodb) 
 [![license](https://img.shields.io/npm/l/w-orm-mongodb.svg?style=flat)](https://npmjs.org/package/w-orm-mongodb) 
 [![gzip file size](http://img.badgesize.io/yuda-lyu/w-orm-mongodb/master/dist/w-orm-mongodb.umd.js.svg?compression=gzip)](https://github.com/yuda-lyu/w-orm-mongodb)
 [![npm download](https://img.shields.io/npm/dt/w-orm-mongodb.svg)](https://npmjs.org/package/w-orm-mongodb) 
