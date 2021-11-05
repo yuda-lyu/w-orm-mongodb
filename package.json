@@ -1,7 +1,7 @@
 {
   "name": "w-orm-mongodb",
   "version": "1.1.23",
-  "description": "An object of operator for mongodb in nodejs, like a simple ORM.",
+  "description": "An object of operator for mongodb in nodejs.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
     "mongodb": "^4.1.2",
