@@ -1,16 +1,16 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.1.25",
+  "version": "1.1.26",
   "description": "An object of operator for mongodb in nodejs.",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
-    "mongodb": "^4.2.2",
+    "mongodb": "^4.5.0",
     "saslprep": "^1.0.3",
     "lodash": "^4.17.21",
-    "wsemi": "^1.6.34"
+    "wsemi": "^1.6.54"
   },
   "devDependencies": {
-    "w-package-tools": "^1.0.59"
+    "w-package-tools": "^1.0.65"
   },
   "scripts": {
     "test": "mocha --parallel --timeout 60000 --experimental-modules --es-module-specifier-resolution=node",
