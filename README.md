@@ -1,5 +1,5 @@
 # w-orm-mongodb
-An object of operator for mongodb in nodejs.
+An operator for mongodb in nodejs.
 
 ![language](https://img.shields.io/badge/language-JavaScript-orange.svg) 
 [![npm version](http://img.shields.io/npm/v/w-orm-mongodb.svg?style=flat)](https://npmjs.org/package/w-orm-mongodb) 
