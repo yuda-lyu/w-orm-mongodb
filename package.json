@@ -1,16 +1,15 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.1.26",
-  "description": "An operator for mongodb in nodejs.",
+  "version": "1.1.27",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
-    "mongodb": "^4.5.0",
+    "mongodb": "^4.13.0",
     "saslprep": "^1.0.3",
     "lodash": "^4.17.21",
-    "wsemi": "^1.6.54"
+    "wsemi": "^1.6.87"
   },
   "devDependencies": {
-    "w-package-tools": "^1.0.65"
+    "w-package-tools": "^1.0.66"
   },
   "scripts": {
     "test": "mocha --parallel --timeout 60000 --experimental-modules --es-module-specifier-resolution=node",
@@ -29,9 +28,5 @@
     "nodejs"
   ],
   "author": "yuda-lyu(semisphere)",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/yuda-lyu/w-orm-mongodb/issues"
-  },
-  "homepage": "https://github.com/yuda-lyu/w-orm-mongodb#readme"
+  "license": "MIT"
 }
