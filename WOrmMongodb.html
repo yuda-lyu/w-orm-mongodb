@@ -14,6 +14,7 @@
     <link type="text/css" rel="stylesheet" href="styles/prettify.css">
     <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
     <script src="scripts/nav.js" defer></script>
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
@@ -27,7 +28,9 @@
 
 <nav >
     
+    
     <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WOrmMongodb.html">WOrmMongodb</a><ul class='methods'><li data-type='method'><a href="WOrmMongodb.html#.del">del</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAll">delAll</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAllGfs">delAllGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.delGfs">delGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.insert">insert</a></li><li data-type='method'><a href="WOrmMongodb.html#.insertGfs">insertGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.save">save</a></li><li data-type='method'><a href="WOrmMongodb.html#.select">select</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectGfs">selectGfs</a></li></ul></li></ul>
+    
 </nav>
 
 <div id="main">
@@ -45,7 +48,9 @@
 <header>
     
         <h2>
-        WOrmMongodb
+        
+            WOrmMongodb
+        
         </h2>
         
     
@@ -67,6 +72,10 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>操作資料庫(MongoDB)</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
@@ -110,9 +119,6 @@
 
 
 
-<div class="description usertext">
-    <p>操作資料庫(MongoDB)</p>
-</div>
 
 
 
@@ -121,10 +127,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -160,6 +163,7 @@
             
                 
 <span class="param-type">Object</span>
+
 
 
             
@@ -224,6 +228,7 @@
 <span class="param-type">String</span>
 
 
+
             
             </td>
 
@@ -263,6 +268,7 @@
 <span class="param-type">String</span>
 
 
+
             
             </td>
 
@@ -300,6 +306,7 @@
             
                 
 <span class="param-type">String</span>
+
 
 
             
@@ -354,7 +361,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -370,6 +377,7 @@
     <dd>
         
 <span class="param-type">Object</span>
+
 
 
     </dd>
@@ -405,7 +413,7 @@
 
     
 
-    <h4 class="name" id=".del"><span class="type-signature">(async, static) </span>del<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".del"><span class="type-signature type-signature-async, static">(async, static) </span>del<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -413,11 +421,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>刪除數據</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line289">line 289</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line306">line 306</a>
     </li></ul></dd>
     
 
@@ -456,9 +468,6 @@
 
 
 
-<div class="description usertext">
-    <p>刪除數據</p>
-</div>
 
 
 
@@ -467,10 +476,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -507,6 +513,7 @@
 <span class="param-type">Array</span>
 
 
+
             
             </td>
 
@@ -536,7 +543,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -554,6 +561,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -566,7 +574,7 @@
 
     
 
-    <h4 class="name" id=".delAll"><span class="type-signature">(async, static) </span>delAll<span class="signature">(find<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".delAll"><span class="type-signature type-signature-async, static">(async, static) </span>delAll<span class="signature">(find<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -574,11 +582,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line353">line 353</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line374">line 374</a>
     </li></ul></dd>
     
 
@@ -617,9 +629,6 @@
 
 
 
-<div class="description usertext">
-    <p>刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表</p>
-</div>
 
 
 
@@ -628,10 +637,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -667,6 +673,7 @@
             
                 
 <span class="param-type">Object</span>
+
 
 
             
@@ -714,7 +721,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -732,6 +739,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -744,7 +752,7 @@
 
     
 
-    <h4 class="name" id=".delAllGfs"><span class="type-signature">(async, static) </span>delAllGfs<span class="signature">(find<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".delAllGfs"><span class="type-signature type-signature-async, static">(async, static) </span>delAllGfs<span class="signature">(find<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -752,11 +760,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line647">line 647</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line728">line 728</a>
     </li></ul></dd>
     
 
@@ -795,9 +807,6 @@
 
 
 
-<div class="description usertext">
-    <p>使用GridFS，刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表</p>
-</div>
 
 
 
@@ -806,10 +815,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -845,6 +851,7 @@
             
                 
 <span class="param-type">Object</span>
+
 
 
             
@@ -892,7 +899,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -910,6 +917,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -922,7 +930,7 @@
 
     
 
-    <h4 class="name" id=".delGfs"><span class="type-signature">(async, static) </span>delGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".delGfs"><span class="type-signature type-signature-async, static">(async, static) </span>delGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -930,11 +938,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除數據</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line555">line 555</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line622">line 622</a>
     </li></ul></dd>
     
 
@@ -973,9 +985,6 @@
 
 
 
-<div class="description usertext">
-    <p>使用GridFS，刪除數據</p>
-</div>
 
 
 
@@ -984,10 +993,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -1021,6 +1027,7 @@
 <span class="param-type">String</span>
 
 
+
             
             </td>
 
@@ -1050,7 +1057,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -1068,6 +1075,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -1080,7 +1088,7 @@
 
     
 
-    <h4 class="name" id=".insert"><span class="type-signature">(async, static) </span>insert<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".insert"><span class="type-signature type-signature-async, static">(async, static) </span>insert<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1088,11 +1096,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>插入數據，插入同樣數據會自動產生不同_id，故insert前需自行判斷有無重複</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line104">line 104</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line114">line 114</a>
     </li></ul></dd>
     
 
@@ -1131,9 +1143,6 @@
 
 
 
-<div class="description usertext">
-    <p>插入數據，插入同樣數據會自動產生不同_id，故insert前需自行判斷有無重複</p>
-</div>
 
 
 
@@ -1142,10 +1151,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -1182,6 +1188,7 @@
 <span class="param-type">Array</span>
 
 
+
             
             </td>
 
@@ -1211,7 +1218,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -1229,6 +1236,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -1241,7 +1249,7 @@
 
     
 
-    <h4 class="name" id=".insertGfs"><span class="type-signature">(async, static) </span>insertGfs<span class="signature">(u8a)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".insertGfs"><span class="type-signature type-signature-async, static">(async, static) </span>insertGfs<span class="signature">(u8a)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1249,11 +1257,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，插入數據，需為Uint8Array格式</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line394">line 394</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line425">line 425</a>
     </li></ul></dd>
     
 
@@ -1292,9 +1304,6 @@
 
 
 
-<div class="description usertext">
-    <p>使用GridFS，插入數據，需為Uint8Array格式</p>
-</div>
 
 
 
@@ -1303,10 +1312,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -1340,6 +1346,7 @@
 <span class="param-type">Uint8Array</span>
 
 
+
             
             </td>
 
@@ -1369,7 +1376,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -1387,6 +1394,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -1399,7 +1407,7 @@
 
     
 
-    <h4 class="name" id=".save"><span class="type-signature">(async, static) </span>save<span class="signature">(data, option<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".save"><span class="type-signature type-signature-async, static">(async, static) </span>save<span class="signature">(data, option<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1407,11 +1415,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>儲存數據</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line172">line 172</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line196">line 196</a>
     </li></ul></dd>
     
 
@@ -1450,9 +1462,6 @@
 
 
 
-<div class="description usertext">
-    <p>儲存數據</p>
-</div>
 
 
 
@@ -1461,10 +1470,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -1503,6 +1509,7 @@
 |
 
 <span class="param-type">Array</span>
+
 
 
             
@@ -1538,6 +1545,7 @@
             
                 
 <span class="param-type">Object</span>
+
 
 
             
@@ -1602,6 +1610,7 @@
 <span class="param-type">boolean</span>
 
 
+
             
             </td>
 
@@ -1639,6 +1648,7 @@
             
                 
 <span class="param-type">boolean</span>
+
 
 
             
@@ -1693,7 +1703,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -1711,6 +1721,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -1723,7 +1734,7 @@
 
     
 
-    <h4 class="name" id=".select"><span class="type-signature">(async, static) </span>select<span class="signature">(find<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".select"><span class="type-signature type-signature-async, static">(async, static) </span>select<span class="signature">(find<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1731,6 +1742,10 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>查詢數據</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
@@ -1774,9 +1789,6 @@
 
 
 
-<div class="description usertext">
-    <p>查詢數據</p>
-</div>
 
 
 
@@ -1785,10 +1797,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -1824,6 +1833,7 @@
             
                 
 <span class="param-type">Object</span>
+
 
 
             
@@ -1871,7 +1881,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -1889,6 +1899,7 @@
 <span class="param-type">Promise</span>
 
 
+
     </dd>
 </dl>
 
@@ -1901,7 +1912,7 @@
 
     
 
-    <h4 class="name" id=".selectGfs"><span class="type-signature">(async, static) </span>selectGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".selectGfs"><span class="type-signature type-signature-async, static">(async, static) </span>selectGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1909,11 +1920,15 @@
 
 
 <dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，查詢數據</p></li></ul></dd>
+    
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line457">line 457</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line511">line 511</a>
     </li></ul></dd>
     
 
@@ -1952,9 +1967,6 @@
 
 
 
-<div class="description usertext">
-    <p>使用GridFS，查詢數據</p>
-</div>
 
 
 
@@ -1963,10 +1975,7 @@
 
 
 
-
-
-
-    <h5>Parameters:</h5>
+    <h5 class="h5-parameters">Parameters:</h5>
     
 
 <table class="params">
@@ -2000,6 +2009,7 @@
 <span class="param-type">String</span>
 
 
+
             
             </td>
 
@@ -2029,7 +2039,7 @@
 
 
 
-<h5>Returns:</h5>
+<h5 class="h5-returns">Returns:</h5>
 
         
 <div class="param-desc">
@@ -2045,6 +2055,7 @@
     <dd>
         
 <span class="param-type">Promise</span>
+
 
 
     </dd>
@@ -2074,7 +2085,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.10</a> on Thu Jan 19 2023 14:38:11 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Thu Mar 30 2023 11:53:34 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
