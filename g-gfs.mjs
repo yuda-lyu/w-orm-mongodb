@@ -26,10 +26,15 @@ async function test() {
     //fn_in, fn_out
     let fn_in = path.resolve('../', './_data', 'data(in).dat')
     let fn_out = path.resolve('../', './_data', 'data(out).dat')
+    // console.log('fn_in', fn_in)
+    // console.log('fn_out', fn_out)
 
 
     //unlinkSync
-    fs.unlinkSync(fn_out)
+    try {
+        fs.unlinkSync(fn_out)
+    }
+    catch (err) {}
 
 
     //u8a
@@ -57,6 +62,12 @@ async function test() {
     //selectGfs
     let gs = await w.selectGfs(gi.id)
     console.log('selectGfs', gs)
+    console.log('gs[0]', gs[0], gs[0] === 0)
+    console.log('gs[1]', gs[1], gs[1] === 0)
+    console.log('gs[2]', gs[2], gs[2] === 0)
+    console.log('gs[3]', gs[3], gs[3] === 24)
+    console.log('gs[4]', gs[4], gs[4] === 102)
+    console.log('gs.length', gs.length, gs.length === 47381362)
     fs.writeFileSync(fn_out, gs)
 
 

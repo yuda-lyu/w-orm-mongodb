@@ -158,7 +158,11 @@ test()
 //   }
 // ]
 // select by $or, $and, $ne, $in, $nin [
-//   { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 },
+//   {
+//     id: 'id-rosemary',
+//     name: 'rosemary(modify)',
+//     value: 123.456
+//   },
 //   {
 //     id: {random id},
 //     name: 'kettle',

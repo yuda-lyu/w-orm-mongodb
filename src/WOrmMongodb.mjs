@@ -60,37 +60,47 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳數據，reject回傳錯誤訊息
      */
     async function select(find = {}) {
-
-        //pm
-        let pm = genPm()
+        let isErr = false
 
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
-        let collection = database.collection(opt.cl)
+        //res
+        let res = null
+        try {
 
-        //find
-        collection
-            .find(find) //find第二參數為option, 可放sort或limit等
+            //database, collection
+            let database = client.db(opt.db)
+            let collection = database.collection(opt.cl)
+
+            //find
+            let cursor = collection.find(find)
             //.sort({ $natural: -1 })
             //.limit(N)
-            .toArray(function(err, res) {
-                if (err) {
-                    pm.reject(err)
-                }
-                else {
-                    res = map(res, function(v) {
-                        v = omit(v, '_id')
-                        return v
-                    })
-                    pm.resolve(res)
-                }
-                client.close()
+
+            //toArray
+            res = await cursor.toArray()
+
+            //omit
+            res = map(res, function(v) {
+                v = omit(v, '_id')
+                return v
             })
 
-        return pm
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -102,60 +112,74 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息
      */
     async function insert(data) {
+        let isErr = false
 
         //cloneDeep
         data = cloneDeep(data)
 
-        //pm
-        let pm = genPm()
-
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
-        let collection = database.collection(opt.cl)
+        //res
+        let res = null
+        try {
 
-        //check
-        if (!isarr(data)) {
-            data = [data]
-        }
+            //database, collection
+            let database = client.db(opt.db)
+            let collection = database.collection(opt.cl)
 
-        //check
-        data = map(data, function(v) {
-            if (!v.id) {
-                v.id = genID()
+            //check
+            if (!isarr(data)) {
+                data = [data]
             }
-            return v
-        })
 
-        //insertMany
-        collection
-            .insertMany(data, function(err, res) {
-                if (err) {
-                    pm.reject(err)
+            //check id
+            data = map(data, function(v) {
+                if (!v.id) {
+                    v.id = genID()
                 }
-                else {
-
-                    //check
-                    if (res.insertedCount > 0) {
-                        res = {
-                            n: size(data),
-                            nInserted: res.insertedCount,
-                            ok: res.acknowledged ? 1 : 0,
-                        }
-                        pm.resolve(res)
-                        ee.emit('change', 'insert', data, res)
-                    }
-                    else {
-                        pm.reject(err)
-                    }
-
-                }
-                client.close()
+                return v
             })
 
-        return pm
+            //insertMany
+            res = await collection.insertMany(data)
+
+            //check
+            if (res.insertedCount > 0) {
+
+                //res
+                res = {
+                    n: size(data),
+                    nInserted: res.insertedCount,
+                    ok: res.acknowledged ? 1 : 0,
+                }
+
+                //emit
+                ee.emit('change', 'insert', data, res)
+
+            }
+            else {
+                isErr = true
+
+                //res
+                res = `no insert data`
+
+            }
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -170,6 +194,7 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳儲存結果，reject回傳錯誤訊息
      */
     async function save(data, option = {}) {
+        let isErr = false
 
         //cloneDeep
         data = cloneDeep(data)
@@ -178,104 +203,96 @@ function WOrmMongodb(opt = {}) {
         let autoInsert = get(option, 'autoInsert', true)
         let atomic = get(option, 'atomic', false)
 
-        //pm
-        let pm = genPm()
-
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
-        let collection = database.collection(opt.cl)
+        //res
+        let res = null
+        try {
 
-        //check
-        if (!isarr(data)) {
-            data = [data]
-        }
+            //database, collection
+            let database = client.db(opt.db)
+            let collection = database.collection(opt.cl)
 
-        //oper
-        let oper = null
-        if (atomic) {
-            oper = 'findOneAndUpdate'
-        }
-        else {
-            oper = 'updateOne'
-        }
-
-        //pmSeries
-        pmSeries(data, async(v) => {
-            let pmm = genPm()
+            //check
+            if (!isarr(data)) {
+                data = [data]
+            }
 
             //oper
-            collection[oper]({ id: v.id }, { $set: v }, function(err, res) {
-                // console.log(oper, 'res', res)
-                if (err) {
-                    pmm.reject(err)
+            let oper = null
+            if (atomic) {
+                oper = 'findOneAndUpdate'
+            }
+            else {
+                oper = 'updateOne'
+            }
+
+            //pmSeries
+            res = await pmSeries(data, async(v) => {
+
+                //rest
+                let rest = null
+
+                //oper
+                rest = await collection[oper]({ id: v.id }, { $set: v },)
+
+                //lastErrorObject for findOneAndUpdate
+                if (rest.lastErrorObject) {
+                    // console.log('rest.lastErrorObject', rest.lastErrorObject)
+                    rest = {
+                        // lastErrorObject: { n: 1, updatedExisting: true },
+                        // value: {
+                        //   _id: new ObjectId("615c18bb6e5db9935b10d88e"),
+                        //   id: 'id-rosemary',
+                        //   name: 'rosemary',
+                        //   value: 123.456
+                        // },
+                        // ok: 1
+                        n: rest.lastErrorObject.n,
+                        nModified: rest.lastErrorObject.updatedExisting ? 1 : 0,
+                        ok: 1,
+                    }
                 }
                 else {
-
-                    //lastErrorObject for findOneAndUpdate
-                    if (res.lastErrorObject) {
-                        // console.log('res.lastErrorObject', res.lastErrorObject)
-                        res = {
-                            // lastErrorObject: { n: 1, updatedExisting: true },
-                            // value: {
-                            //   _id: new ObjectId("615c18bb6e5db9935b10d88e"),
-                            //   id: 'id-rosemary',
-                            //   name: 'rosemary',
-                            //   value: 123.456
-                            // },
-                            // ok: 1
-                            n: res.lastErrorObject.n,
-                            nModified: res.lastErrorObject.updatedExisting ? 1 : 0,
-                            ok: 1,
-                        }
+                    rest = {
+                        // acknowledged: true,
+                        // modifiedCount: 1,
+                        // upsertedId: null,
+                        // upsertedCount: 0,
+                        // matchedCount: 1
+                        n: rest.matchedCount,
+                        nModified: rest.modifiedCount,
+                        ok: rest.acknowledged ? 1 : 0,
                     }
-                    else {
-                        res = {
-                            // acknowledged: true,
-                            // modifiedCount: 1,
-                            // upsertedId: null,
-                            // upsertedCount: 0,
-                            // matchedCount: 1
-                            n: res.matchedCount,
-                            nModified: res.modifiedCount,
-                            ok: res.acknowledged ? 1 : 0,
-                        }
-                    }
-                    // console.log('res', res)
-
-                    //autoInsert
-                    if (autoInsert && res.n === 0) {
-                        insert(v)
-                            .then(function(res) {
-                                pmm.resolve(res)
-                            })
-                            .catch(function(err) {
-                                pmm.reject(err)
-                            })
-                    }
-                    else {
-                        pmm.resolve(res)
-                    }
-
                 }
+                // console.log('rest', rest)
+
+                //autoInsert
+                if (autoInsert && rest.n === 0) {
+                    rest = await insert(v)
+                }
+
+                return rest
             })
 
-            return pmm
-        })
-            .then(function(msg) {
-                pm.resolve(msg)
-                ee.emit('change', 'save', data, msg)
-            })
-            .catch(function(msg) {
-                pm.reject(msg)
-            })
-            .finally(function() {
-                client.close()
-            })
+            //emit
+            ee.emit('change', 'save', data, res)
 
-        return pm
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -287,59 +304,63 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
     async function del(data) {
+        let isErr = false
 
         //cloneDeep
         data = cloneDeep(data)
 
-        //pm
-        let pm = genPm()
-
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
-        let collection = database.collection(opt.cl)
+        //res
+        let res = null
+        try {
 
-        //check
-        if (!isarr(data)) {
-            data = [data]
+            //database, collection
+            let database = client.db(opt.db)
+            let collection = database.collection(opt.cl)
+
+            //check
+            if (!isarr(data)) {
+                data = [data]
+            }
+
+            //pmSeries
+            res = await pmSeries(data, async(v) => {
+
+                //rest
+                let rest = null
+
+                //deleteOne
+                rest = await collection.deleteOne({ id: v.id })
+
+                //rest
+                rest = {
+                    n: rest.deletedCount,
+                    nDeleted: rest.deletedCount,
+                    ok: rest.acknowledged ? 1 : 0,
+                }
+
+                return rest
+            })
+
+            //emit
+            ee.emit('change', 'del', data, res)
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
         }
 
-        //pmSeries
-        pmSeries(data, function(v) {
-            let pmm = genPm()
-
-            //deleteOne
-            collection
-                .deleteOne({ id: v.id }, function(err, res) {
-                    if (err) {
-                        pmm.resolve(err) //找不到數據刪除採resovle回傳
-                    }
-                    else {
-                        res = {
-                            n: res.deletedCount,
-                            nDeleted: res.deletedCount,
-                            ok: res.acknowledged ? 1 : 0,
-                        }
-                        pmm.resolve(res)
-                    }
-                })
-
-            return pmm
-        })
-            .then(function(msg) {
-                pm.resolve(msg)
-                ee.emit('change', 'del', data, msg)
-            })
-            .catch(function(msg) {
-                pm.reject(msg)
-            })
-            .finally(function() {
-                client.close()
-            })
-
-        return pm
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -351,36 +372,46 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
     async function delAll(find = {}) {
-
-        //pm
-        let pm = genPm()
+        let isErr = false
 
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
-        let collection = database.collection(opt.cl)
+        //res
+        let res = null
+        try {
 
-        //deleteMany
-        collection
-            .deleteMany(find, function(err, res) {
-                if (err) {
-                    pm.resolve(err) //找不到數據刪除採resovle回傳
-                }
-                else {
-                    res = {
-                        n: res.deletedCount,
-                        nDeleted: res.deletedCount,
-                        ok: res.acknowledged ? 1 : 0,
-                    }
-                    pm.resolve(res)
-                    ee.emit('change', 'delAll', null, res)
-                }
-                client.close()
-            })
+            //database, collection
+            let database = client.db(opt.db)
+            let collection = database.collection(opt.cl)
 
-        return pm
+            //deleteMany
+            res = await collection.deleteMany(find)
+
+            //res
+            res = {
+                n: res.deletedCount,
+                nDeleted: res.deletedCount,
+                ok: res.acknowledged ? 1 : 0,
+            }
+
+            //emit
+            ee.emit('change', 'delAll', null, res)
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -392,9 +423,7 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息
      */
     async function insertGfs(u8a) {
-
-        //pm
-        let pm = genPm()
+        let isErr = false
 
         //id
         let id = genID()
@@ -403,47 +432,72 @@ function WOrmMongodb(opt = {}) {
         let buf = Buffer.from(u8a)
 
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
+        //core
+        let core = async (id, buf) => {
 
-        //bucket
-        let bucket = new mongodb.GridFSBucket(database, {
-            chunkSizeBytes: 10 * 1024 * 1024, //10mb
-            bucketName: opt.cl
-        })
+            //pm
+            let pm = genPm()
 
-        //stream
-        let sm = new stream.Readable()
-        sm._read = () => {}
-        sm.push(buf)
-        sm.push(null)
-        sm.pipe(bucket.openUploadStream(id)) //pipe是接bucket的Writable, 所以會監聽finish
-            .on('error', function(err) {
+            //database
+            let database = client.db(opt.db)
 
-                //reject
-                pm.reject(err)
-
-                //close
-                client.close()
-
-            })
-            .on('finish', function() {
-                let res = { n: 1, ok: 1, id: id }
-
-                //resolve
-                pm.resolve(res)
-
-                //emit
-                ee.emit('change', 'insertGfs', null, res)
-
-                //close
-                client.close()
-
+            //bucket
+            let bucket = new mongodb.GridFSBucket(database, {
+                chunkSizeBytes: 10 * 1024 * 1024, //10mb
+                bucketName: opt.cl
             })
 
-        return pm
+            //stream
+            let sm = new stream.Readable()
+            sm._read = () => {}
+            sm.push(buf)
+            sm.push(null)
+            sm.pipe(bucket.openUploadStream(id)) //pipe是接bucket的Writable, 所以會監聽finish
+                .on('error', function(err) {
+
+                    //reject
+                    pm.reject(err)
+
+                })
+                .on('finish', function() {
+
+                    //res
+                    let res = { n: 1, ok: 1, id }
+
+                    //resolve
+                    pm.resolve(res)
+
+                })
+
+            return pm
+        }
+
+        //res
+        let res = null
+        try {
+
+            //core
+            res = await core(id, buf)
+
+            //emit
+            ee.emit('change', 'insertGfs', null, res)
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -455,93 +509,106 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳數據，reject回傳錯誤訊息
      */
     async function selectGfs(id) {
-
-        //pm
-        let pm = genPm()
+        let isErr = false
 
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
+        //core
+        let core = async (id) => {
 
-        //bucket
-        let bucket = new mongodb.GridFSBucket(database, {
-            chunkSizeBytes: 10 * 1024 * 1024, //10mb
-            bucketName: opt.cl
-        })
+            //pm
+            let pm = genPm()
 
-        //buf
-        let buf = Buffer.from('')
-
-        //stream
-        let sm = bucket.openDownloadStreamByName(id)
-        sm.on('data', function (chunk) {
-            buf = Buffer.concat([buf, chunk])
-        })
-        sm.on('error', function (err) {
-
-            //reject
-            pm.reject(err)
-
-            //close
-            client.close()
-
-        })
-        sm.on('end', function () {
-
-            //u8a
-            let u8a = new Uint8Array(buf)
-
-            //clean memory
-            buf = null
-
-            //resolve
-            pm.resolve(u8a)
-
-            //close
-            client.close()
-
-        })
-
-        return pm
-    }
-
-
-    async function _findGfs(find = {}, bucket = null) {
-
-        //pm
-        let pm = genPm()
-
-        //bucket
-        if (bucket === null) {
-
-            //client
-            let client = await MongoClient.connect(opt.url, optMGConn)
-
-            //database, collection
+            //database
             let database = client.db(opt.db)
 
             //bucket
-            bucket = new mongodb.GridFSBucket(database, {
+            let bucket = new mongodb.GridFSBucket(database, {
                 chunkSizeBytes: 10 * 1024 * 1024, //10mb
                 bucketName: opt.cl
             })
 
-        }
+            //buf
+            let buf = Buffer.from('')
 
-        //find
-        bucket.find(find)
-            .toArray(function(err, res) {
-                if (err) {
-                    pm.reject(err)
-                }
-                else {
-                    pm.resolve(res)
-                }
+            //stream
+            let sm = bucket.openDownloadStreamByName(id)
+            sm.on('data', function (chunk) {
+                buf = Buffer.concat([buf, chunk])
+            })
+            sm.on('error', function (err) {
+
+                //reject
+                pm.reject(err)
+
+            })
+            sm.on('end', function () {
+
+                //u8a
+                let u8a = new Uint8Array(buf)
+
+                //clean memory
+                buf = null
+
+                //resolve
+                pm.resolve(u8a)
+
             })
 
-        return pm
+            return pm
+        }
+
+        //res
+        let res = null
+        try {
+
+            //core
+            res = await core(id)
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
+    }
+
+
+    async function _findGfs(find = {}, bucket) {
+        let isErr = false
+
+        //res
+        let res = null
+        try {
+
+            //find
+            let cursor = bucket.find(find)
+
+            //toArray
+            res = await cursor.toArray()
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            // await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -553,87 +620,101 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
     async function delGfs(id) {
-
-        //pm
-        let pm = genPm()
+        let isErr = false
 
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
+        //res
+        let res = null
+        try {
 
-        //bucket
-        let bucket = new mongodb.GridFSBucket(database, {
-            chunkSizeBytes: 10 * 1024 * 1024, //10mb
-            bucketName: opt.cl
-        })
+            //database, collection
+            let database = client.db(opt.db)
 
-        //_findGfs
-        let res = await _findGfs({ filename: id }, bucket)
-
-        //check
-        if (res.length === 0) {
-            pm.reject('can not find id')
-            client.close()
-        }
-        else if (res.length > 1) {
-            pm.reject('duplicate id')
-            client.close()
-        }
-        else {
-
-            //bid, get _id from res[0]
-            let bid = res[0]._id
-
-            //delete
-            bucket.delete(bid, function(err) {
-                if (err) {
-                    pm.reject(err)
-                }
-                else {
-                    let res = {
-                        n: 1,
-                        nDeleted: 1,
-                        ok: 1,
-                    }
-
-                    //resolve
-                    pm.resolve(res)
-
-                    //emit
-                    ee.emit('change', 'delGfs', null, res)
-
-                }
-                client.close()
+            //bucket
+            let bucket = new mongodb.GridFSBucket(database, {
+                chunkSizeBytes: 10 * 1024 * 1024, //10mb
+                bucketName: opt.cl
             })
 
+            //_findGfs
+            res = await _findGfs({ filename: id }, bucket)
+
+            //check
+            if (res.length === 0) {
+                res = `can not find id[${id}]`
+            }
+            else if (res.length > 1) {
+                res = `duplicate id[${id}]`
+            }
+            else {
+
+                //bid, get _id from res[0]
+                let bid = res[0]._id
+
+                //delete
+                res = await bucket.delete(bid)
+
+                //res
+                res = {
+                    n: 1,
+                    nDeleted: 1,
+                    ok: 1,
+                }
+
+                //emit
+                ee.emit('change', 'delGfs', null, res)
+
+            }
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
         }
 
-        return pm
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
     async function _delGfs(bid, bucket) {
+        let isErr = false
 
-        //pm
-        let pm = genPm()
+        //res
+        let res = null
+        try {
 
-        //delete
-        bucket.delete(bid, function(err) {
-            if (err) {
-                pm.reject(err)
+            //delete
+            res = await bucket.delete(bid)
+
+            //res
+            res = {
+                n: 1,
+                nDeleted: 1,
+                ok: 1,
             }
-            else {
-                pm.resolve({
-                    n: 1,
-                    nDeleted: 1,
-                    ok: 1,
-                })
-            }
-        })
 
-        return pm
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            // await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
@@ -645,54 +726,62 @@ function WOrmMongodb(opt = {}) {
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
     async function delAllGfs(find = {}) {
-
-        //pm
-        let pm = genPm()
+        let isErr = false
 
         //client
-        let client = await MongoClient.connect(opt.url, optMGConn)
+        // let client = await MongoClient.connect(opt.url, optMGConn)
+        let client = new MongoClient(opt.url, optMGConn)
 
-        //database, collection
-        let database = client.db(opt.db)
+        //res
+        let res = null
+        try {
 
-        //bucket
-        let bucket = new mongodb.GridFSBucket(database, {
-            chunkSizeBytes: 10 * 1024 * 1024, //10mb
-            bucketName: opt.cl
-        })
+            //database, collection
+            let database = client.db(opt.db)
 
-        //_findGfs
-        let res = await _findGfs(find, bucket)
-
-        //n
-        let n = size(res)
-
-        //ps
-        let ps = map(res, function(v) {
-            let bid = v._id
-            return _delGfs(bid, bucket)
-        })
-
-        //all
-        Promise.all(ps)
-            .then(function(msg) {
-                let res = { n, ok: 1 }
-
-                //resolve
-                pm.resolve(res)
-
-                //emit
-                ee.emit('change', 'delAllGfs', null, res)
-
-            })
-            .catch(function(msg) {
-                pm.reject(msg)
-            })
-            .finally(function() {
-                client.close()
+            //bucket
+            let bucket = new mongodb.GridFSBucket(database, {
+                chunkSizeBytes: 10 * 1024 * 1024, //10mb
+                bucketName: opt.cl
             })
 
-        return pm
+            //_findGfs
+            res = await _findGfs(find, bucket)
+
+            //n
+            let n = size(res)
+
+            //ps
+            let ps = map(res, function(v) {
+                let bid = v._id
+                return _delGfs(bid, bucket)
+            })
+
+            //all
+            res = await Promise.all(ps)
+
+            //res
+            res = {
+                n,
+                ok: 1
+            }
+
+            //emit
+            ee.emit('change', 'delAllGfs', null, res)
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+        }
+
+        if (isErr) {
+            return Promise.reject(res)
+        }
+        return res
     }
 
 
