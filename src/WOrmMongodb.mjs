@@ -231,12 +231,13 @@ function WOrmMongodb(opt = {}) {
 
             //pmSeries
             res = await pmSeries(data, async(v) => {
+                console.log('pmSeries v', v)
 
                 //rest
                 let rest = null
 
                 //oper
-                rest = await collection[oper]({ id: v.id }, { $set: v },)
+                rest = await collection[oper]({ id: v.id }, { $set: v })
 
                 //lastErrorObject for findOneAndUpdate
                 if (rest.lastErrorObject) {
