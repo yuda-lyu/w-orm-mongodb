@@ -231,7 +231,6 @@ function WOrmMongodb(opt = {}) {
 
             //pmSeries
             res = await pmSeries(data, async(v) => {
-                console.log('pmSeries v', v)
 
                 //rest
                 let rest = null
