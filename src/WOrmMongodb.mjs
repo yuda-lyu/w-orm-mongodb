@@ -1,22 +1,22 @@
 import events from 'events'
 import mongodb from 'mongodb'
 import stream from 'stream'
-import cloneDeep from 'lodash/cloneDeep'
-import get from 'lodash/get'
-import map from 'lodash/map'
-import omit from 'lodash/omit'
-import size from 'lodash/size'
+import cloneDeep from 'lodash-es/cloneDeep'
+import get from 'lodash-es/get'
+import map from 'lodash-es/map'
+import omit from 'lodash-es/omit'
+import size from 'lodash-es/size'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
 
 
-//optMGConn
-let optMGConn = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}
+// //optMGConn
+// let optMGConn = {
+//     useNewUrlParser: true,
+//     useUnifiedTopology: true
+// }
 
 
 /**
@@ -64,7 +64,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null
@@ -119,7 +120,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null
@@ -205,7 +207,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null
@@ -311,7 +314,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null
@@ -376,7 +380,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null
@@ -433,7 +438,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //core
         let core = async (id, buf) => {
@@ -513,7 +519,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //core
         let core = async (id) => {
@@ -624,7 +631,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null
@@ -730,7 +738,8 @@ function WOrmMongodb(opt = {}) {
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
-        let client = new MongoClient(opt.url, optMGConn)
+        // let client = new MongoClient(opt.url, optMGConn)
+        let client = new MongoClient(opt.url)
 
         //res
         let res = null

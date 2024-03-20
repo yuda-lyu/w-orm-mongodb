@@ -6,6 +6,7 @@ An operator for mongodb in nodejs.
 [![license](https://img.shields.io/npm/l/w-orm-mongodb.svg?style=flat)](https://npmjs.org/package/w-orm-mongodb) 
 [![gzip file size](http://img.badgesize.io/yuda-lyu/w-orm-mongodb/master/dist/w-orm-mongodb.umd.js.svg?compression=gzip)](https://github.com/yuda-lyu/w-orm-mongodb)
 [![npm download](https://img.shields.io/npm/dt/w-orm-mongodb.svg)](https://npmjs.org/package/w-orm-mongodb) 
+[![npm download](https://img.shields.io/npm/dm/w-orm-mongodb.svg)](https://npmjs.org/package/w-orm-mongodb) 
 [![jsdelivr download](https://img.shields.io/jsdelivr/npm/hm/w-orm-mongodb.svg)](https://www.jsdelivr.com/package/npm/w-orm-mongodb)
 
 ## Documentation
