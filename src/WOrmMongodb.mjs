@@ -9,6 +9,7 @@ import size from 'lodash-es/size.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
+import iseobj from 'wsemi/src/iseobj.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
 
 
@@ -192,7 +193,6 @@ function WOrmMongodb(opt = {}) {
      * @param {Object|Array} data 輸入數據物件或陣列
      * @param {Object} [option={}] 輸入設定物件，預設為{}
      * @param {boolean} [option.autoInsert=true] 輸入是否於儲存時發現原本無數據，則自動改以插入處理，預設為true
-     * @param {boolean} [option.atomic=false] 輸入是否於儲存時採用上鎖，避免同時操作互改問題，預設為false
      * @returns {Promise} 回傳Promise，resolve回傳儲存結果，reject回傳錯誤訊息
      */
     async function save(data, option = {}) {
@@ -201,9 +201,8 @@ function WOrmMongodb(opt = {}) {
         //cloneDeep
         data = cloneDeep(data)
 
-        //autoInsert, atomic
+        //autoInsert
         let autoInsert = get(option, 'autoInsert', true)
-        let atomic = get(option, 'atomic', false)
 
         //client
         // let client = await MongoClient.connect(opt.url, optMGConn)
@@ -223,16 +222,6 @@ function WOrmMongodb(opt = {}) {
                 data = [data]
             }
 
-            //oper
-            let oper = null
-            if (atomic) {
-                oper = 'findOneAndUpdate'
-            }
-            else {
-                oper = 'updateOne'
-            }
-            // console.log('oper', oper)
-
             //pmSeries
             res = await pmSeries(data, async(v) => {
 
@@ -240,16 +229,10 @@ function WOrmMongodb(opt = {}) {
                 let rest = null
 
                 //oper
-                rest = await collection[oper]({ id: v.id }, { $set: v })
+                rest = await collection.findOneAndUpdate({ id: v.id }, { $set: v })
                 // console.log('rest', rest)
 
-                if (rest) {
-                    // rest {
-                    //     _id: new ObjectId('66002783fdb8a009c825f716'),
-                    //     id: 'id-peter',
-                    //     name: 'peter',
-                    //     value: 123
-                    //   }
+                if (iseobj(rest)) {
                     rest = {
                         n: 1,
                         nModified: 1,
@@ -263,36 +246,6 @@ function WOrmMongodb(opt = {}) {
                         ok: 1,
                     }
                 }
-
-                // //check
-                // if (get(rest, 'lastErrorObject')) { //findOneAndUpdate
-                //     // console.log('rest.lastErrorObject', rest.lastErrorObject)
-                //     rest = {
-                //         // lastErrorObject: { n: 1, updatedExisting: true },
-                //         // value: {
-                //         //   _id: new ObjectId("615c18bb6e5db9935b10d88e"),
-                //         //   id: 'id-rosemary',
-                //         //   name: 'rosemary',
-                //         //   value: 123.456
-                //         // },
-                //         // ok: 1
-                //         n: get(rest, 'lastErrorObject.n', -1),
-                //         nModified: get(rest, 'lastErrorObject.updatedExisting', false) ? 1 : 0,
-                //         ok: 1,
-                //     }
-                // }
-                // else { //updateOne
-                //     rest = {
-                //         // acknowledged: true,
-                //         // modifiedCount: 1,
-                //         // upsertedId: null,
-                //         // upsertedCount: 0,
-                //         // matchedCount: 1
-                //         n: get(rest, 'matchedCount', -1),
-                //         nModified: get(rest, 'modifiedCount', -1),
-                //         ok: get(rest, 'acknowledged', false) ? 1 : 0,
-                //     }
-                // }
 
                 //autoInsert
                 if (autoInsert && rest.n === 0) {

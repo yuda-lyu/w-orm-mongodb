@@ -109,4 +109,4 @@ test()
 // change delGfs
 // delGfs { n: 1, nDeleted: 1, ok: 1 }
 
-//node --experimental-modules --es-module-specifier-resolution=node g-gfs.mjs
+//node --experimental-modules g-gfs.mjs

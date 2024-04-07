@@ -117,7 +117,7 @@ if (isWindows()) {
                 { n: 1, nModified: 1, ok: 1 },
                 { n: 0, nModified: 0, ok: 1 }
             ]
-            await w.save(rsm, { autoInsert: false, atomic: true })
+            await w.save(rsm, { autoInsert: false })
                 .then(function(msg) {
                     // console.log('save then', msg)
                     // save then [

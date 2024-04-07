@@ -75,7 +75,7 @@ async function test() {
 
 
     //save
-    await w.save(rsm, { autoInsert: false, atomic: true })
+    await w.save(rsm, { autoInsert: false })
         .then(function(msg) {
             console.log('save then', msg)
         })
@@ -173,4 +173,4 @@ test()
 // change del
 // del then [ { n: 1, nDeleted: 1, ok: 1 } ]
 
-//node --experimental-modules --es-module-specifier-resolution=node g-basic.mjs
+//node --experimental-modules g-basic.mjs

@@ -98,7 +98,7 @@ async function test() {
 
 
     //save
-    await w.save(rsm, { autoInsert: false, atomic: true })
+    await w.save(rsm, { autoInsert: false })
         .then(function(msg) {
             console.log('save then', msg)
         })
