@@ -1,7 +1,7 @@
 import path from 'path'
 import fs from 'fs'
-import wo from './src/WOrmMongodb.mjs'
-//import wo from './dist/w-orm-mongodb.umd.js'
+import WOrm from './src/WOrmMongodb.mjs'
+//import WOrm from './dist/w-orm-mongodb.umd.js'
 
 
 let opt = {
@@ -12,16 +12,13 @@ let opt = {
 
 async function test() {
 
-
-    //w
-    let w = wo(opt)
-
+    //wo
+    let wo = WOrm(opt)
 
     //on
-    w.on('change', function(mode, data, res) {
+    wo.on('change', function(mode, data, res) {
         console.log('change', mode)
     })
-
 
     //fn_in, fn_out
     let fn_in = path.resolve('../', './_data', 'data(in).dat')
@@ -29,13 +26,11 @@ async function test() {
     // console.log('fn_in', fn_in)
     // console.log('fn_out', fn_out)
 
-
     //unlinkSync
     try {
         fs.unlinkSync(fn_out)
     }
     catch (err) {}
-
 
     //u8a
     let b = await fs.readFileSync(fn_in)
@@ -43,9 +38,8 @@ async function test() {
     // let u8a = new Uint8Array([66, 97, 115]) //Uint8Array data from nodejs or browser
     console.log('u8a', u8a)
 
-
     //delAllGfs
-    await w.delAllGfs()
+    await wo.delAllGfs()
         .then(function(msg) {
             console.log('delAllGfs then', msg)
         })
@@ -53,14 +47,12 @@ async function test() {
             console.log('delAllGfs catch', msg)
         })
 
-
     //insertGfs
-    let gi = await w.insertGfs(u8a)
+    let gi = await wo.insertGfs(u8a)
     console.log('insertGfs', gi)
 
-
     //selectGfs
-    let gs = await w.selectGfs(gi.id)
+    let gs = await wo.selectGfs(gi.id)
     console.log('selectGfs', gs)
     console.log('gs[0]', gs[0], gs[0] === 0)
     console.log('gs[1]', gs[1], gs[1] === 0)
@@ -70,11 +62,9 @@ async function test() {
     console.log('gs.length', gs.length, gs.length === 47381362)
     fs.writeFileSync(fn_out, gs)
 
-
     //delGfs
-    let gd = await w.delGfs(gi.id)
+    let gd = await wo.delGfs(gi.id)
     console.log('delGfs', gd)
-
 
 }
 test()
@@ -109,4 +99,4 @@ test()
 // change delGfs
 // delGfs { n: 1, nDeleted: 1, ok: 1 }
 
-//node --experimental-modules g-gfs.mjs
+//node g-gfs.mjs

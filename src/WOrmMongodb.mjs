@@ -8,6 +8,7 @@ import omit from 'lodash-es/omit.js'
 import size from 'lodash-es/size.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
+import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
@@ -97,7 +98,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -139,7 +142,7 @@ function WOrmMongodb(opt = {}) {
 
             //check id
             data = map(data, function(v) {
-                if (!v.id) {
+                if (!isestr(v.id)) {
                     v.id = genID()
                 }
                 return v
@@ -177,7 +180,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -222,6 +227,14 @@ function WOrmMongodb(opt = {}) {
                 data = [data]
             }
 
+            //check id
+            data = map(data, function(v) {
+                if (!isestr(v.id)) {
+                    v.id = genID()
+                }
+                return v
+            })
+
             //pmSeries
             res = await pmSeries(data, async(v) => {
 
@@ -265,7 +278,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -334,7 +349,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -386,7 +403,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -473,7 +492,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -556,7 +577,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -659,7 +682,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)
@@ -760,7 +785,9 @@ function WOrmMongodb(opt = {}) {
         }
         finally {
             await client.close()
+            client = null
         }
+
 
         if (isErr) {
             return Promise.reject(res)

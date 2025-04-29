@@ -1,7 +1,7 @@
 import assert from 'assert'
 import path from 'path'
 import fs from 'fs'
-import wo from '../src/WOrmMongodb.mjs'
+import WOrm from '../src/WOrmMongodb.mjs'
 
 
 function isWindows() {
@@ -15,9 +15,7 @@ if (isWindows()) {
         let vans = {}
         let vget = {}
 
-
         before(async function () {
-
 
             let opt = {
                 url: 'mongodb://username:password@127.0.0.1:27017',
@@ -25,16 +23,13 @@ if (isWindows()) {
                 cl: 'usersGfs',
             }
 
-
-            //w
-            let w = wo(opt)
-
+            //wo
+            let wo = WOrm(opt)
 
             //on
-            w.on('change', function(mode, data, res) {
+            wo.on('change', function(mode, data, res) {
                 // console.log('change', mode)
             })
-
 
             //fn_in, fn_out
             let fn_in = path.resolve('../', './_data', 'data(in).dat')
@@ -42,13 +37,11 @@ if (isWindows()) {
             // console.log('fn_in', fn_in)
             // console.log('fn_out', fn_out)
 
-
             //unlinkSync
             try {
                 fs.unlinkSync(fn_out)
             }
             catch (err) {}
-
 
             //u8a
             let b = await fs.readFileSync(fn_in)
@@ -56,11 +49,10 @@ if (isWindows()) {
             // let u8a = new Uint8Array([66, 97, 115]) //Uint8Array data from nodejs or browser
             // console.log('u8a', u8a)
 
-
             //delAllGfs
             rt = null
             vans[1] = { n: 0, ok: 1 }
-            await w.delAllGfs()
+            await wo.delAllGfs()
                 .then(function(msg) {
                     // console.log('delAllGfs then', msg)
                     // delAllGfs then { n: 0, ok: 1 }
@@ -72,7 +64,6 @@ if (isWindows()) {
                 })
             vget[1] = rt
 
-
             //insertGfs
             let gi = null
             rt = null
@@ -81,7 +72,7 @@ if (isWindows()) {
                 ok: 1,
                 // id: {random id},
             }
-            await w.insertGfs(u8a)
+            await wo.insertGfs(u8a)
                 .then(function(msg) {
                     // console.log('insertGfs then', msg)
                     // insertGfs { n: 1, ok: 1, id: {random id} }
@@ -97,7 +88,6 @@ if (isWindows()) {
                 })
             vget[2] = rt
 
-
             //selectGfs
             rt = null
             vans[3] = [
@@ -108,7 +98,7 @@ if (isWindows()) {
                 102,
                 47381362,
             ]
-            await w.selectGfs(gi.id)
+            await wo.selectGfs(gi.id)
                 .then(function(msg) {
                     // console.log('selectGfs then', msg)
                     // console.log('msg[0]', msg[0], msg[0] === 0)
@@ -145,11 +135,10 @@ if (isWindows()) {
                 })
             vget[3] = rt
 
-
             //delGfs
             rt = null
             vans[4] = { n: 1, nDeleted: 1, ok: 1 }
-            await w.delGfs(gi.id)
+            await wo.delGfs(gi.id)
                 .then(function(msg) {
                     // console.log('delGfs then', msg)
                     // delGfs { n: 1, nDeleted: 1, ok: 1 }
@@ -161,29 +150,23 @@ if (isWindows()) {
                 })
             vget[4] = rt
 
-
         })
-
 
         it(`should get ${JSON.stringify(vans[1])} for delAllGfs`, function() {
             assert.strict.deepStrictEqual(vget[1], vans[1])
         })
 
-
         it(`should get ${JSON.stringify(vans[2])} for insertGfs`, async function() {
             assert.strict.deepStrictEqual(vget[2], vans[2])
         })
-
 
         it(`should get ${JSON.stringify(vans[3])} for selectGfs`, async function() {
             assert.strict.deepStrictEqual(vget[3], vans[3])
         })
 
-
         it(`should get ${JSON.stringify(vans[4])} for delGfs`, async function() {
             assert.strict.deepStrictEqual(vget[4], vans[4])
         })
-
 
     })
 }
