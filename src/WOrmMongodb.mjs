@@ -10,6 +10,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
+import isearr from 'wsemi/src/isearr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
 
@@ -101,7 +102,6 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
-
         if (isErr) {
             return Promise.reject(res)
         }
@@ -118,6 +118,15 @@ function WOrmMongodb(opt = {}) {
      */
     async function insert(data) {
         let isErr = false
+
+        //check
+        if (!iseobj(data) && !isearr(data)) {
+            return {
+                n: 0,
+                nInserted: 0,
+                ok: 1,
+            }
+        }
 
         //cloneDeep
         data = cloneDeep(data)
@@ -183,7 +192,6 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
-
         if (isErr) {
             return Promise.reject(res)
         }
@@ -202,6 +210,11 @@ function WOrmMongodb(opt = {}) {
      */
     async function save(data, option = {}) {
         let isErr = false
+
+        //check
+        if (!iseobj(data) && !isearr(data)) {
+            return []
+        }
 
         //cloneDeep
         data = cloneDeep(data)
@@ -281,7 +294,6 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
-
         if (isErr) {
             return Promise.reject(res)
         }
@@ -298,6 +310,11 @@ function WOrmMongodb(opt = {}) {
      */
     async function del(data) {
         let isErr = false
+
+        //check
+        if (!iseobj(data) && !isearr(data)) {
+            return []
+        }
 
         //cloneDeep
         data = cloneDeep(data)
@@ -351,7 +368,6 @@ function WOrmMongodb(opt = {}) {
             await client.close()
             client = null
         }
-
 
         if (isErr) {
             return Promise.reject(res)
@@ -495,7 +511,6 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
-
         if (isErr) {
             return Promise.reject(res)
         }
@@ -579,7 +594,6 @@ function WOrmMongodb(opt = {}) {
             await client.close()
             client = null
         }
-
 
         if (isErr) {
             return Promise.reject(res)
@@ -685,7 +699,6 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
-
         if (isErr) {
             return Promise.reject(res)
         }
@@ -787,7 +800,6 @@ function WOrmMongodb(opt = {}) {
             await client.close()
             client = null
         }
-
 
         if (isErr) {
             return Promise.reject(res)
