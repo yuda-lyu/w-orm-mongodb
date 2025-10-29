@@ -12,10 +12,12 @@ An operator for mongodb in nodejs.
 To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-orm-mongodb/WOrm.html).
 
 ## Installation
+
 ### Using npm(ES6 module):
 ```alias
 npm i w-orm-mongodb
 ```
+
 #### Example for collection
 > **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-basic.mjs)]
 ```alias
@@ -180,6 +182,7 @@ test()
 // change del
 // del then [ { n: 1, nDeleted: 1, ok: 1 } ]
 ```
+
 #### Example for GridFS
 > **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-gfs.mjs)]
 ```alias
