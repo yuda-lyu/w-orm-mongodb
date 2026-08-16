@@ -20,6 +20,16 @@ let genOpt = (cl) => {
     }
 }
 
+//genOptPk, 明確指定autoGenPk
+let genOptPk = (cl, autoGenPk) => {
+    return {
+        url: genUrl(ctPort),
+        db: ctDb,
+        cl,
+        autoGenPk,
+    }
+}
+
 //genKeys, 取回傳物件之鍵集合, 用於驗證鍵集合固定
 let genKeys = (v) => {
     return Object.keys(v).sort().join(',')
@@ -523,6 +533,128 @@ describe('gfs legacy duplicated id', function() {
     vans[3] = { files: 0, chunks: 0 }
     it(`should get ${JSON.stringify(vans[3])} for files and chunks after delGfs with legacy duplicated id`, async function() {
         assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+})
+
+
+describe('gfs autoGenPk', function() {
+    let rt = null
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(300000)
+
+        //woDef, 未給autoGenPk以驗證其預設值為true
+        let clDef = 'pkdefaultGfs'
+        let woDef = WOrm(genOpt(clDef))
+        await woDef.delAllGfs()
+
+        //預設未帶id者須自動產生
+        vget[1] = await woDef.insertGfs({ u8a: genU8a(100, 1) })
+        vget[2] = (await countDocs(clDef)).files
+
+        //woOff, 關閉後主鍵須由呼叫端自備
+        let clOff = 'pkoffGfs'
+        let woOff = WOrm(genOptPk(clOff, false))
+        await woOff.delAllGfs()
+
+        //帶id者正常寫入
+        vget[3] = await woOff.insertGfs({ id: 'g1', u8a: genU8a(100, 2) })
+        vget[4] = genHash((await woOff.selectByPkGfs('g1')).u8a) === genHash(genU8a(100, 2))
+
+        //未帶id者須reject
+        rt = null
+        // vans[5] = 'Error: invalid data[0].id, autoGenPk is false'
+        await woOff.insertGfs({ u8a: genU8a(100, 3) })
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[5] = rt
+
+        //整批reject時, 同批之有效筆數亦不得被寫入
+        let cBefore = await countDocs(clOff)
+        rt = null
+        // vans[6] = 'Error: invalid data[1].id, autoGenPk is false'
+        await woOff.insertGfs([
+            { id: 'g-ok1', u8a: genU8a(100, 4) },
+            { u8a: genU8a(100, 5) },
+            { id: 'g-ok2', u8a: genU8a(100, 6) },
+        ])
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[6] = rt
+        let cAfter = await countDocs(clOff)
+        vget[7] = { files: cAfter.files - cBefore.files, chunks: cAfter.chunks - cBefore.chunks }
+        vget[8] = [
+            await woOff.selectByPkGfs('g-ok1'),
+            await woOff.selectByPkGfs('g-ok2'),
+        ]
+
+        //delGfs不受autoGenPk影響, 未帶有效id仍為該筆ok為0而非reject
+        vget[9] = await woOff.delGfs({ u8a: genU8a(10) })
+
+        //輸入無效仍依T5回空結果
+        vget[10] = await woOff.insertGfs(null)
+
+    })
+
+    vans[1] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[1])} for insertGfs without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = 1
+    it(`should get ${JSON.stringify(vans[2])} for files after insertGfs without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[3])} for insertGfs with id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+    vans[4] = true
+    it(`should get ${JSON.stringify(vans[4])} for content after insertGfs with id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[4], vans[4])
+    })
+
+    vans[5] = 'Error: invalid data[0].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[5])} for insertGfs without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+    vans[6] = 'Error: invalid data[1].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[6])} for insertGfs with 1 record without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[6], vans[6])
+    })
+
+    vans[7] = { files: 0, chunks: 0 }
+    it(`should get ${JSON.stringify(vans[7])} for not writing valid records in rejected insertGfs batch`, async function() {
+        assert.strict.deepStrictEqual(vget[7], vans[7])
+    })
+
+    vans[8] = [null, null]
+    it(`should get ${JSON.stringify(vans[8])} for records after rejected insertGfs batch`, async function() {
+        assert.strict.deepStrictEqual(vget[8], vans[8])
+    })
+
+    vans[9] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+    it(`should get ${JSON.stringify(vans[9])} for delGfs without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[9], vans[9])
+    })
+
+    vans[10] = { n: 0, nInserted: 0, ok: 1 }
+    it(`should get ${JSON.stringify(vans[10])} for insertGfs with invalid data by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[10], vans[10])
     })
 
 })

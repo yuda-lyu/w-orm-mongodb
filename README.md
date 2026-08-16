@@ -236,7 +236,35 @@ delAll(find)        → { n, nDeleted, ok }
 
 `del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
 
-本套件之主鍵欄位固定為`id`，尚未支援由呼叫端指定。`id`為無業務語義之識別碼，故`insert`與`save`於輸入未帶有效`id`時自動補值，`del`則不補值。
+## Primary key
+
+本套件之主鍵欄位固定為`id`，尚未支援由呼叫端指定。`id`為無業務語義之識別碼。
+
+主鍵由誰產生，由建構設定`opt.autoGenPk`決定：
+
+| `opt.autoGenPk` | 行為 |
+|---|---|
+| `true`（預設） | `insert`、`save`、`insertGfs`於輸入未帶有效`id`時，由套件以`genID()`自動產生 |
+| `false` | 套件一律不產生`id`，`id`須由呼叫端於寫入前自備 |
+
+`autoGenPk: false`之定位為**依賴注入**：`id`的產生規則改由呼叫端掌握（如採用外部發號器、以業務欄位組合、沿用上游系統既有識別碼），套件不介入。採用此設定後，**`id`之唯一性、格式與是否與既有資料衝突，皆由呼叫端自負**。
+
+`autoGenPk`為建構層設定，**不得於`insert`與`save`之`option`逐次覆寫**——主鍵由誰產生是整個資料表的政策，若逐次可改，同一資料表將混入兩種來源之`id`而難以追溯。
+
+`autoGenPk: false`而輸入未帶有效`id`時，以`Promise.reject`拋出，屬整批性錯誤而不進入逐筆結果。主鍵檢查於任何寫入之前一次完成，故整批`reject`時**同批之有效筆數亦不會被寫入**。
+
+`del`不受`autoGenPk`影響，於任一設定下皆不補值——未帶有效`id`者視為該筆無法處理，回`ok: 0`並附`err`。
+
+```alias
+//預設: 未帶id者自動產生
+let wo = WOrm({ url, db: 'worm', cl: 'users' })
+await wo.insert({ name: 'peter' }) // => { n: 1, nInserted: 1, ok: 1 }
+
+//關閉: id須自備
+let woOff = WOrm({ url, db: 'worm', cl: 'users', autoGenPk: false })
+await woOff.insert({ id: 'id-peter', name: 'peter' }) // => { n: 1, nInserted: 1, ok: 1 }
+await woOff.insert({ name: 'peter' })                 // => reject: invalid data[0].id, autoGenPk is false
+```
 
 ## Upgrading
 

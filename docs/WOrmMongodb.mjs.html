@@ -56,6 +56,7 @@ import omit from 'lodash-es/omit.js'
 import size from 'lodash-es/size.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
+import isbol from 'wsemi/src/isbol.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
@@ -67,14 +68,16 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
 /**
  * 操作資料庫(MongoDB)
  *
- * 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。
- * id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自動補值；del不補值。
+ * 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。id為無業務語義之識別碼。
+ * opt.autoGenPk預設為true，insert、save與insertGfs於輸入未帶有效id時自動產生；del於任一設定下皆不補值。
+ * opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。
  *
  * @class
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {String} [opt.url='mongodb://127.0.0.1:27017'] 輸入連接資料庫字串，預設'mongodb://127.0.0.1:27017'
  * @param {String} [opt.db='worm'] 輸入使用資料庫名稱字串，預設'worm'
  * @param {String} [opt.cl='test'] 輸入使用資料表名稱字串，預設'test'
+ * @param {Boolean} [opt.autoGenPk=true] 輸入是否於輸入未帶有效主鍵時自動產生主鍵值，預設true。為false時主鍵須由呼叫端自備，屬依賴注入之定位，主鍵之唯一性、格式與是否與既有資料衝突皆由呼叫端自負。本設定為建構層設定，不得於insert與save之option逐次覆寫
  * @returns {Object} 回傳操作資料庫物件，各事件功能詳見說明
  */
 function WOrmMongodb(opt = {}) {
@@ -89,6 +92,13 @@ function WOrmMongodb(opt = {}) {
     }
     if (!opt.cl) {
         opt.cl = 'test'
+    }
+
+
+    //autoGenPk, 預設開啟, 為false時主鍵一律由呼叫端自備, 套件不產生亦不補救
+    let autoGenPk = get(opt, 'autoGenPk')
+    if (!isbol(autoGenPk)) {
+        autoGenPk = true
     }
 
 
@@ -143,6 +153,37 @@ function WOrmMongodb(opt = {}) {
         catch (err) {
             console.log(err)
         }
+    }
+
+
+    /**
+     * 檢查並補齊單筆數據之主鍵
+     * autoGenPk為true時未帶有效id者自動產生，為false時往外拋
+     * 註: 未帶有效id屬呼叫端未履行契約而非某一筆資料本身之問題，故為整批性錯誤而不降級為該筆ok為0，
+     * 若降級為逐筆結果，呼叫端易於整批resolve之下漏看，使[忘了給id]靜默變成[少寫了幾筆]
+     * 註: 本函數須於任何寫入之前一次對全部數據完成，令拋錯時同批之有效筆數亦不會被寫入
+     *
+     * @ignore
+     * @param {Object} v 輸入數據物件
+     * @param {Number} k 輸入數據於陣列內之索引
+     * @returns {Object} 回傳補齊主鍵之數據物件
+     */
+    function procPk(v, k) {
+
+        //check
+        if (!isestr(v.id)) {
+
+            //check, autoGenPk為false時主鍵須由呼叫端自備
+            if (!autoGenPk) {
+                throw new Error(`invalid data[${k}].id, autoGenPk is false`)
+            }
+
+            //genID
+            v.id = genID()
+
+        }
+
+        return v
     }
 
 
@@ -385,6 +426,7 @@ function WOrmMongodb(opt = {}) {
      * 插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
      * 由MongoDB於唯一索引上原子完成[檢查id未存在]與[寫入]，併發時同一id僅有一次成功
      * 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
@@ -424,13 +466,8 @@ function WOrmMongodb(opt = {}) {
                 data = [data]
             }
 
-            //check id
-            data = map(data, function(v) {
-                if (!isestr(v.id)) {
-                    v.id = genID()
-                }
-                return v
-            })
+            //check id, 須於任何寫入之前一次完成, 令autoGenPk為false而拋錯時同批之有效筆數亦不會被寫入
+            data = map(data, procPk)
 
             //ensureIndex
             await ensureIndex(collection)
@@ -605,6 +642,7 @@ function WOrmMongodb(opt = {}) {
      * 儲存數據，以id為準更新既有數據，未給之欄位會保留；id不存在且option.autoInsert為true時改為插入
      * 註: n為id命中筆數，命中或經插入而產生皆為1；[內容相同]之判定基準為將待儲存物件合併進現值後結果與現值相同，
      * 相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報
+     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
@@ -645,13 +683,8 @@ function WOrmMongodb(opt = {}) {
                 data = [data]
             }
 
-            //check id
-            data = map(data, function(v) {
-                if (!isestr(v.id)) {
-                    v.id = genID()
-                }
-                return v
-            })
+            //check id, 須於任何寫入之前一次完成, 令autoGenPk為false而拋錯時同批之有效筆數亦不會被寫入
+            data = map(data, procPk)
 
             //ensureIndex
             await ensureIndex(collection)
@@ -855,8 +888,9 @@ function WOrmMongodb(opt = {}) {
 
     /**
      * 使用GridFS，插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
-     * 數據物件形狀為{ id, u8a }，id未給時自動產生，u8a須為Uint8Array
+     * 數據物件形狀為{ id, u8a }，u8a須為Uint8Array
      * 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列，各數據物件形狀為{ id, u8a }
@@ -906,9 +940,7 @@ function WOrmMongodb(opt = {}) {
             //u8a無效屬呼叫端給值錯誤且整批函數無從逐筆回報, 故往外拋
             data = map(data, function(v, k) {
                 v = { ...v }
-                if (!isestr(v.id)) {
-                    v.id = genID()
-                }
+                v = procPk(v, k)
                 if (!isu8arr(v.u8a)) {
                     throw new Error(`invalid data[${k}].u8a`)
                 }
@@ -1322,7 +1354,7 @@ export default WOrmMongodb
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Aug 16 2026 23:36:47 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Aug 17 2026 07:33:48 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

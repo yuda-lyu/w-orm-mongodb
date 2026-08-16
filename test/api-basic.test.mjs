@@ -10,12 +10,22 @@ let ctDb = 'worm'
 let ctPort = null //容器對外埠, 由startContainer動態取得
 
 
-//genOpt
+//genOpt, 不帶autoGenPk以驗證其預設值
 let genOpt = (cl) => {
     return {
         url: genUrl(ctPort),
         db: ctDb,
         cl,
+    }
+}
+
+//genOptPk, 明確指定autoGenPk
+let genOptPk = (cl, autoGenPk) => {
+    return {
+        url: genUrl(ctPort),
+        db: ctDb,
+        cl,
+        autoGenPk,
     }
 }
 
@@ -1124,6 +1134,224 @@ describe('change event', function() {
     vans[5] = { n: 0, nDeleted: 0, ok: 1 }
     it(`should get ${JSON.stringify(vans[5])} for delAll with throwing listener`, async function() {
         assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+})
+
+
+describe('autoGenPk', function() {
+    let rt = null
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(120000)
+
+        //woDef, 未給autoGenPk以驗證其預設值為true
+        let woDef = WOrm(genOpt('pkdefault'))
+        await woDef.delAll()
+
+        //預設未帶id者須自動產生, 且產生之id須為有效字串
+        vget[1] = await woDef.insert({ name: 'no-id' })
+        let ssDef = await woDef.select()
+        vget[2] = ssDef.length
+        vget[3] = typeof ssDef[0].id === 'string' && ssDef[0].id.length > 0
+
+        //預設之save未帶id者亦須自動產生
+        vget[4] = await woDef.save({ name: 'no-id-save' })
+        vget[5] = (await woDef.select()).length
+
+        //woOn, 明確開啟
+        let woOn = WOrm(genOptPk('pkon', true))
+        await woOn.delAll()
+        vget[6] = await woOn.insert({ name: 'no-id' })
+        vget[7] = (await woOn.select()).length
+
+        //woOff, 關閉後主鍵須由呼叫端自備
+        let woOff = WOrm(genOptPk('pkoff', false))
+        await woOff.delAll()
+
+        //帶id者正常寫入
+        vget[8] = await woOff.insert({ id: 'p1', name: 'given' })
+        vget[9] = await woOff.selectByPk('p1')
+
+        //未帶id者須reject, 屬整批性錯誤而不進入逐筆結果
+        rt = null
+        // vans[10] = 'Error: invalid data[0].id, autoGenPk is false'
+        await woOff.insert({ name: 'no-id' })
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[10] = rt
+
+        //save未帶id者亦須reject, autoInsert兩種取值皆同
+        rt = null
+        // vans[11] = 'Error: invalid data[0].id, autoGenPk is false'
+        await woOff.save({ name: 'no-id' })
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[11] = rt
+
+        rt = null
+        // vans[12] = 'Error: invalid data[0].id, autoGenPk is false'
+        await woOff.save({ name: 'no-id' }, { autoInsert: false })
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[12] = rt
+
+        //整批reject時, 同批之有效筆數亦不得被寫入
+        rt = null
+        // vans[13] = 'Error: invalid data[1].id, autoGenPk is false'
+        await woOff.insert([
+            { id: 'p-ok1', name: 'ok1' },
+            { name: 'no-id' },
+            { id: 'p-ok2', name: 'ok2' },
+        ])
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[13] = rt
+        vget[14] = [
+            await woOff.selectByPk('p-ok1'),
+            await woOff.selectByPk('p-ok2'),
+        ]
+
+        //save之整批reject亦同
+        await woOff.insert({ id: 'p-base', name: 'base' })
+        await woOff.save([
+            { id: 'p-base', name: 'should-not-write' },
+            { name: 'no-id' },
+        ]).catch(() => {})
+        vget[15] = (await woOff.selectByPk('p-base')).name
+
+        //del不受autoGenPk影響, 未帶有效id仍為該筆ok為0而非reject
+        vget[16] = await woOff.del({ name: 'no-id' })
+
+        //autoGenPk為建構層設定, 不得於option逐次覆寫
+        rt = null
+        // vans[17] = 'Error: invalid data[0].id, autoGenPk is false'
+        await woOff.save({ name: 'no-id' }, { autoGenPk: true })
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[17] = rt
+
+        //輸入無效仍依T5回空結果, 不因autoGenPk為false而reject
+        vget[18] = await woOff.insert(null)
+        vget[19] = await woOff.save(null)
+
+    })
+
+    vans[1] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[1])} for insert without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = 1
+    it(`should get ${JSON.stringify(vans[2])} for records after insert without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = true
+    it(`should get ${JSON.stringify(vans[3])} for generated id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+    vans[4] = [{ n: 1, nInserted: 1, nModified: 0, ok: 1 }]
+    it(`should get ${JSON.stringify(vans[4])} for save without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[4], vans[4])
+    })
+
+    vans[5] = 2
+    it(`should get ${JSON.stringify(vans[5])} for records after save without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+    vans[6] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[6])} for insert without id by autoGenPk=true`, async function() {
+        assert.strict.deepStrictEqual(vget[6], vans[6])
+    })
+
+    vans[7] = 1
+    it(`should get ${JSON.stringify(vans[7])} for records after insert without id by autoGenPk=true`, async function() {
+        assert.strict.deepStrictEqual(vget[7], vans[7])
+    })
+
+    vans[8] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[8])} for insert with id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[8], vans[8])
+    })
+
+    vans[9] = { id: 'p1', name: 'given' }
+    it(`should get ${JSON.stringify(vans[9])} for record after insert with id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[9], vans[9])
+    })
+
+    vans[10] = 'Error: invalid data[0].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[10])} for insert without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[10], vans[10])
+    })
+
+    vans[11] = 'Error: invalid data[0].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[11])} for save without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[11], vans[11])
+    })
+
+    vans[12] = 'Error: invalid data[0].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[12])} for save(autoInsert=false) without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[12], vans[12])
+    })
+
+    vans[13] = 'Error: invalid data[1].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[13])} for insert with 1 record without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[13], vans[13])
+    })
+
+    vans[14] = [null, null]
+    it(`should get ${JSON.stringify(vans[14])} for not writing valid records in rejected batch`, async function() {
+        assert.strict.deepStrictEqual(vget[14], vans[14])
+    })
+
+    vans[15] = 'base'
+    it(`should get ${JSON.stringify(vans[15])} for not writing valid records in rejected save batch`, async function() {
+        assert.strict.deepStrictEqual(vget[15], vans[15])
+    })
+
+    vans[16] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+    it(`should get ${JSON.stringify(vans[16])} for del without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[16], vans[16])
+    })
+
+    vans[17] = 'Error: invalid data[0].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[17])} for not overriding autoGenPk by option`, async function() {
+        assert.strict.deepStrictEqual(vget[17], vans[17])
+    })
+
+    vans[18] = { n: 0, nInserted: 0, ok: 1 }
+    it(`should get ${JSON.stringify(vans[18])} for insert with invalid data by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[18], vans[18])
+    })
+
+    vans[19] = []
+    it(`should get ${JSON.stringify(vans[19])} for save with invalid data by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[19], vans[19])
     })
 
 })
