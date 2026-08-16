@@ -296,10 +296,10 @@ describe('basic', function() {
         // vans[17] = []
         vget[17] = await wo.select({ name: 'not-existed' })
 
-        //selectById, 由id直接查找單筆
+        //selectByPk, 由id直接查找單筆
         rt = null
         // vans[10] = { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
-        await wo.selectById('id-rosemary')
+        await wo.selectByPk('id-rosemary')
             .then(function(msg) {
                 rt = msg
             })
@@ -308,16 +308,16 @@ describe('basic', function() {
             })
         vget[10] = rt
 
-        //selectById, 與select(find)取得同一筆之內容須一致
+        //selectByPk, 與select(find)取得同一筆之內容須一致
         // vans[11] = true
-        let sbi = await wo.selectById('id-peter')
+        let sbi = await wo.selectByPk('id-peter')
         let sbf = await wo.select({ id: 'id-peter' })
         vget[11] = JSON.stringify(sbi) === JSON.stringify(sbf[0])
 
-        //selectById by id not existed
+        //selectByPk by id not existed
         rt = null
         // vans[12] = null
-        await wo.selectById('id-not-existed')
+        await wo.selectByPk('id-not-existed')
             .then(function(msg) {
                 rt = msg
             })
@@ -326,12 +326,12 @@ describe('basic', function() {
             })
         vget[12] = rt
 
-        //selectById by id invalid, 未給有效id視為查無數據
+        //selectByPk by id invalid, 未給有效id視為查無數據
         // vans[13] = [null, null, null]
         vget[13] = [
-            await wo.selectById(''),
-            await wo.selectById(123),
-            await wo.selectById(null),
+            await wo.selectByPk(''),
+            await wo.selectByPk(123),
+            await wo.selectByPk(null),
         ]
 
         //del
@@ -349,9 +349,9 @@ describe('basic', function() {
             })
         vget[14] = rt
 
-        //selectById, 已刪除者須回傳null
+        //selectByPk, 已刪除者須回傳null
         // vans[15] = null
-        vget[15] = await wo.selectById(d[0].id)
+        vget[15] = await wo.selectByPk(d[0].id)
 
     })
 
@@ -422,22 +422,22 @@ describe('basic', function() {
     })
 
     vans[10] = { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
-    it(`should get ${JSON.stringify(vans[10])} for selectById`, async function() {
+    it(`should get ${JSON.stringify(vans[10])} for selectByPk`, async function() {
         assert.strict.deepStrictEqual(vget[10], vans[10])
     })
 
     vans[11] = true
-    it(`should get ${JSON.stringify(vans[11])} for same content between selectById and select`, async function() {
+    it(`should get ${JSON.stringify(vans[11])} for same content between selectByPk and select`, async function() {
         assert.strict.deepStrictEqual(vget[11], vans[11])
     })
 
     vans[12] = null
-    it(`should get ${JSON.stringify(vans[12])} for selectById by id not existed`, async function() {
+    it(`should get ${JSON.stringify(vans[12])} for selectByPk by id not existed`, async function() {
         assert.strict.deepStrictEqual(vget[12], vans[12])
     })
 
     vans[13] = [null, null, null]
-    it(`should get ${JSON.stringify(vans[13])} for selectById by id invalid`, async function() {
+    it(`should get ${JSON.stringify(vans[13])} for selectByPk by id invalid`, async function() {
         assert.strict.deepStrictEqual(vget[13], vans[13])
     })
 
@@ -447,7 +447,7 @@ describe('basic', function() {
     })
 
     vans[15] = null
-    it(`should get ${JSON.stringify(vans[15])} for selectById after del`, async function() {
+    it(`should get ${JSON.stringify(vans[15])} for selectByPk after del`, async function() {
         assert.strict.deepStrictEqual(vget[15], vans[15])
     })
 
@@ -510,10 +510,10 @@ describe('insert', function() {
         vget[7] = (await wo.select()).length
 
         //同批重複者僅首筆入庫
-        vget[8] = (await wo.selectById('i-dup')).name
+        vget[8] = (await wo.selectByPk('i-dup')).name
 
         //已存在id不得被insert覆寫
-        vget[9] = await wo.selectById('i2')
+        vget[9] = await wo.selectByPk('i2')
 
         //併發後僅存單筆
         vget[10] = (await wo.select({ id: 'i-race' })).length
@@ -605,7 +605,7 @@ describe('save', function() {
         await Promise.all(Array.from({ length: 10 }, (v, k) => {
             return wo.save({ id: 'u1', [`f${k}`]: k })
         }))
-        let vu1 = await wo.selectById('u1')
+        let vu1 = await wo.selectByPk('u1')
         vget[1] = Object.keys(vu1).filter((k) => k.indexOf('f') === 0).length
         vget[2] = vu1.base
 
@@ -616,7 +616,7 @@ describe('save', function() {
         vget[3] = rsn.filter((v) => v[0].nInserted === 1).length
         vget[4] = rsn.filter((v) => v[0].ok !== 1).length
         vget[5] = (await wo.select({ id: 'w1' })).length
-        vget[6] = Object.keys(await wo.selectById('w1')).filter((k) => k.indexOf('g') === 0).length
+        vget[6] = Object.keys(await wo.selectByPk('w1')).filter((k) => k.indexOf('g') === 0).length
 
         //save內容相同不更新, 由MongoDB於伺服器端比對合併後結果與現值
         await wo.insert({ id: 's1', name: 'same', value: 5 })
@@ -633,11 +633,11 @@ describe('save', function() {
         //save內容不同須更新, 未給之欄位須保留
         await wo.insert({ id: 'd1', name: 'diff', value: 5 })
         vget[8] = await wo.save({ id: 'd1', value: 6 })
-        vget[9] = await wo.selectById('d1')
+        vget[9] = await wo.selectByPk('d1')
 
         //save(autoInsert=false)對不存在之id不得插入
         vget[10] = await wo.save({ id: 'n1', name: 'none' }, { autoInsert: false })
-        vget[11] = await wo.selectById('n1')
+        vget[11] = await wo.selectByPk('n1')
 
         //併發save(autoInsert=false)對既有id之不同欄位, 各欄位皆須保留且不得報錯
         await wo.insert({ id: 'p1', name: 'origin', value: 1 })
@@ -646,7 +646,7 @@ describe('save', function() {
             wo.save({ id: 'p1', value: 88 }, { autoInsert: false }),
         ])
         vget[12] = rsu.filter((v) => v[0].ok !== 1).length
-        vget[13] = await wo.selectById('p1')
+        vget[13] = await wo.selectByPk('p1')
 
         //change事件, autoInsert時仍須發出insert事件
         let woEv = WOrm(genOpt('saveevent'))
@@ -812,10 +812,10 @@ describe('save single failure', function() {
         }
 
         //單筆失敗不得中斷整批, 後續筆仍須寫入
-        vget[7] = (await wo.selectById('f3')).name
+        vget[7] = (await wo.selectByPk('f3')).name
 
         //失敗筆不得被寫入
-        vget[8] = await wo.selectById('f2')
+        vget[8] = await wo.selectByPk('f2')
 
     })
 
@@ -920,7 +920,7 @@ describe('del', function() {
         vget[15] = typeof rbig[0].err === 'string' && rbig[0].err.length > 0
 
         //單筆失敗不得中斷整批, 後續筆仍須刪除
-        vget[16] = await wo.selectById('k3')
+        vget[16] = await wo.selectByPk('k3')
 
     })
 
@@ -1094,7 +1094,7 @@ describe('change event', function() {
         })
 
         vget[1] = await wo.insert({ id: 'e1', name: 'a' })
-        vget[2] = await wo.selectById('e1')
+        vget[2] = await wo.selectByPk('e1')
         vget[3] = await wo.save({ id: 'e1', name: 'b' })
         vget[4] = await wo.del({ id: 'e1' })
         vget[5] = await wo.delAll()
@@ -1160,7 +1160,7 @@ describe('cross process concurrency', function() {
             runProc('P1', clSav, 'save', keys),
             runProc('P2', clSav, 'save', keys),
         ])
-        let vx1 = await woSav.selectById('x1')
+        let vx1 = await woSav.selectByPk('x1')
         vget[4] = Object.keys(vx1).filter((k) => k.indexOf('P1k') === 0 || k.indexOf('P2k') === 0).length
         vget[5] = vx1.base
         vget[6] = (await woSav.select()).length

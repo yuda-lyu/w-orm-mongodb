@@ -28,12 +28,12 @@ async function test() {
         { id: 'id-uniq', name: 'uniq' },
     ])
     console.log('insert with duplicated id', ri)
-    console.log('selectById(id-dup)', await wo.selectById('id-dup'))
+    console.log('selectByPk(id-dup)', await wo.selectByPk('id-dup'))
 
     //insert, 對已存在id再插入則跳過而不覆寫
     let re = await wo.insert({ id: 'id-dup', name: 'dup-3' })
     console.log('insert existed id', re)
-    console.log('selectById(id-dup)', await wo.selectById('id-dup'))
+    console.log('selectByPk(id-dup)', await wo.selectByPk('id-dup'))
 
     //insert, 併發對同一id插入10次, nInserted總和為1
     let rc = await Promise.all(Array.from({ length: 10 }, (v, k) => {
@@ -48,19 +48,19 @@ async function test() {
     }))
     console.log('count of nInserted===1 by 5 concurrent save', rs.filter((v) => v[0].nInserted === 1).length)
     console.log('records of id-new', (await wo.select({ id: 'id-new' })).length)
-    console.log('selectById(id-new)', await wo.selectById('id-new'))
+    console.log('selectByPk(id-new)', await wo.selectByPk('id-new'))
 
 }
 test()
 // insert with duplicated id { n: 3, nInserted: 2, ok: 1 }
-// selectById(id-dup) { id: 'id-dup', name: 'dup-1' }
+// selectByPk(id-dup) { id: 'id-dup', name: 'dup-1' }
 // insert existed id { n: 1, nInserted: 0, ok: 1 }
-// selectById(id-dup) { id: 'id-dup', name: 'dup-1' }
+// selectByPk(id-dup) { id: 'id-dup', name: 'dup-1' }
 // sum of nInserted by 10 concurrent insert 1
 // records of id-race 1
 // count of nInserted===1 by 5 concurrent save 1
 // records of id-new 1
-// selectById(id-new) { id: 'id-new', f0: 0, f1: 1, f2: 2, f4: 4, f3: 3 }
+// selectByPk(id-new) { id: 'id-new', f0: 0, f1: 1, f2: 2, f4: 4, f3: 3 }
 // 註: 併發儲存之各欄位皆會保留, 惟欄位順序取決於各次儲存之完成順序, 故每次執行不盡相同
 
 //node g-unique.mjs

@@ -124,13 +124,13 @@ async function test() {
     let sr = await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
     console.log('selectReg', sr)
 
-    //selectById, 由id直接查找單筆, 不需如select提取全部符合數據再處理
-    let sbi = await wo.selectById('id-rosemary')
-    console.log('selectById', sbi)
+    //selectByPk, 由id直接查找單筆, 不需如select提取全部符合數據再處理
+    let sbi = await wo.selectByPk('id-rosemary')
+    console.log('selectByPk', sbi)
 
-    //selectById by id not existed
-    let sbn = await wo.selectById('id-not-existed')
-    console.log('selectById by id not existed', sbn)
+    //selectByPk by id not existed
+    let sbn = await wo.selectByPk('id-not-existed')
+    console.log('selectByPk by id not existed', sbn)
 
     //del
     let d = ss.filter(function(v) {
@@ -187,19 +187,19 @@ test()
 //   }
 // ]
 // selectReg [ { id: 'id-peter', name: 'peter(modify)', value: 123 } ]
-// selectById { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
-// selectById by id not existed null
+// selectByPk { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
+// selectByPk by id not existed null
 // change del
 // del then [ { n: 1, nDeleted: 1, ok: 1 } ]
 ```
 
 ## Return values
 
-本套件屬`w-orm-*`系列，六個函數`select`、`selectById`、`insert`、`save`、`del`、`delAll`之回傳結構依系列統一規格：
+本套件屬`w-orm-*`系列，六個函數`select`、`selectByPk`、`insert`、`save`、`del`、`delAll`之回傳結構依系列統一規格：
 
 ```alias
 select(find)        → [ {...}, {...} ]                    無符合為 []
-selectById(id)      → {...} | null
+selectByPk(pk)      → {...} | null
 
 insert(data)        → { n, nInserted, ok }
 save(data, option)  → [ { n, nInserted, nModified, ok }, ... ]
@@ -236,31 +236,7 @@ delAll(find)        → { n, nDeleted, ok }
 
 `del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
 
-## Concurrency
-
-`insert`之「已存在則跳過」與`save`之「不遺失更新」，由MongoDB於單一文件操作內原子完成，**不須開啟transaction**（transaction另須replica set，standalone不支援）。
-
-| 適用範圍 | 是否保證 |
-|---|---|
-| 單一行程內併發 | 是 |
-| 跨行程併發 | 是 |
-
-原子性全由MongoDB伺服器端提供，本套件每次操作各自建立連線、不持有跨呼叫狀態，故兩種範圍之保證相同。
-
-實測依據（Windows 11 / Node.js 24.19.0 / mongodb driver 7.5.0 / MongoDB 8 單機）：
-
-- 單一行程內對同一`id`併發`insert` 10次，`nInserted`總和為`1`，資料表僅`1`筆。
-- 單一行程內對同一全新`id`併發`save` 5次，`nInserted === 1`者恰`1`筆，資料表僅`1`筆，5次所給欄位全數保留。
-- 跨行程（2個獨立node行程）各自對相同20個`id`執行`insert`，`nInserted`總和為`20`，資料表恰`20`筆。
-- 跨行程（2個獨立node行程）各自對同一既有`id`寫入20個不同欄位，40個欄位全數保留且原欄位未遺失，資料表恰`1`筆。
-
-GridFS亦同（`test/api-gfs.test.mjs`）：
-
-- 對同一`id`併發`insertGfs` 10次，`nInserted`總和為`1`，僅新增1筆files且**未殘留孤兒chunks**。
-
-以上皆為測試案例，可以`npm test`複現。
-
-`delAll`之`nDeleted`於併發下反映該次`deleteMany`實際刪除筆數，不保證等於呼叫當下符合條件之筆數。
+本套件之主鍵欄位固定為`id`，尚未支援由呼叫端指定。`id`為無業務語義之識別碼，故`insert`與`save`於輸入未帶有效`id`時自動補值，`del`則不補值。
 
 ## Upgrading
 
@@ -286,7 +262,7 @@ db['usersGfs.files'].aggregate([
 ])
 ```
 
-`selectByIdGfs`、`delGfs`、`delAllGfs`皆不建立索引，故既有數據縱使尚存重複`id`亦可正常查詢與清除，`delGfs`會將同一`id`之多筆一併刪除並如實回報`nDeleted`。
+`selectByPkGfs`、`delGfs`、`delAllGfs`皆不建立索引，故既有數據縱使尚存重複`id`亦可正常查詢與清除，`delGfs`會將同一`id`之多筆一併刪除並如實回報`nDeleted`。
 
 #### Example for unique id and concurrency
 > **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-unique.mjs)]
@@ -316,12 +292,12 @@ async function test() {
         { id: 'id-uniq', name: 'uniq' },
     ])
     console.log('insert with duplicated id', ri)
-    console.log('selectById(id-dup)', await wo.selectById('id-dup'))
+    console.log('selectByPk(id-dup)', await wo.selectByPk('id-dup'))
 
     //insert, 對已存在id再插入則跳過而不覆寫
     let re = await wo.insert({ id: 'id-dup', name: 'dup-3' })
     console.log('insert existed id', re)
-    console.log('selectById(id-dup)', await wo.selectById('id-dup'))
+    console.log('selectByPk(id-dup)', await wo.selectByPk('id-dup'))
 
     //insert, 併發對同一id插入10次, nInserted總和為1
     let rc = await Promise.all(Array.from({ length: 10 }, (v, k) => {
@@ -336,19 +312,19 @@ async function test() {
     }))
     console.log('count of nInserted===1 by 5 concurrent save', rs.filter((v) => v[0].nInserted === 1).length)
     console.log('records of id-new', (await wo.select({ id: 'id-new' })).length)
-    console.log('selectById(id-new)', await wo.selectById('id-new'))
+    console.log('selectByPk(id-new)', await wo.selectByPk('id-new'))
 
 }
 test()
 // insert with duplicated id { n: 3, nInserted: 2, ok: 1 }
-// selectById(id-dup) { id: 'id-dup', name: 'dup-1' }
+// selectByPk(id-dup) { id: 'id-dup', name: 'dup-1' }
 // insert existed id { n: 1, nInserted: 0, ok: 1 }
-// selectById(id-dup) { id: 'id-dup', name: 'dup-1' }
+// selectByPk(id-dup) { id: 'id-dup', name: 'dup-1' }
 // sum of nInserted by 10 concurrent insert 1
 // records of id-race 1
 // count of nInserted===1 by 5 concurrent save 1
 // records of id-new 1
-// selectById(id-new) { id: 'id-new', f0: 0, f1: 1, f2: 2, f4: 4, f3: 3 }
+// selectByPk(id-new) { id: 'id-new', f0: 0, f1: 1, f2: 2, f4: 4, f3: 3 }
 // 註: 併發儲存之各欄位皆會保留, 惟欄位順序取決於各次儲存之完成順序, 故每次執行不盡相同
 ```
 
@@ -359,7 +335,7 @@ GridFS函數之參數與回傳形狀比照一般操作，數據物件為`{ id, u
 
 | GridFS函數 | 對應一般函數 | 回傳 |
 |---|---|---|
-| `selectByIdGfs(id)` | `selectById` | `{ id, u8a }` 或 `null` |
+| `selectByPkGfs(id)` | `selectByPk` | `{ id, u8a }` 或 `null` |
 | `insertGfs(data)` | `insert` | `{ n, nInserted, ok }` |
 | `delGfs(data)` | `del` | `[ { n, nDeleted, ok }, ... ]` |
 | `delAllGfs(find)` | `delAll` | `{ n, nDeleted, ok }` |
@@ -418,15 +394,15 @@ async function test() {
     let gr = await wo.insertGfs({ id: 'id-file', u8a: genU8a(50) })
     console.log('insertGfs existed id', gr)
 
-    //selectByIdGfs
-    let gs = await wo.selectByIdGfs('id-file')
-    console.log('selectByIdGfs id', gs.id)
-    console.log('selectByIdGfs u8a.length', gs.u8a.length)
-    console.log('selectByIdGfs u8a[0..3]', gs.u8a[0], gs.u8a[1], gs.u8a[2], gs.u8a[3])
+    //selectByPkGfs
+    let gs = await wo.selectByPkGfs('id-file')
+    console.log('selectByPkGfs id', gs.id)
+    console.log('selectByPkGfs u8a.length', gs.u8a.length)
+    console.log('selectByPkGfs u8a[0..3]', gs.u8a[0], gs.u8a[1], gs.u8a[2], gs.u8a[3])
 
-    //selectByIdGfs by id not existed
-    let gn = await wo.selectByIdGfs('id-not-existed')
-    console.log('selectByIdGfs by id not existed', gn)
+    //selectByPkGfs by id not existed
+    let gn = await wo.selectByPkGfs('id-not-existed')
+    console.log('selectByPkGfs by id not existed', gn)
 
     //insertGfs, 一次插入多筆
     let gm = await wo.insertGfs([
@@ -455,10 +431,10 @@ test()
 // insertGfs { n: 1, nInserted: 1, ok: 1 }
 // change insertGfs
 // insertGfs existed id { n: 1, nInserted: 0, ok: 1 }
-// selectByIdGfs id id-file
-// selectByIdGfs u8a.length 1000
-// selectByIdGfs u8a[0..3] 0 1 2 3
-// selectByIdGfs by id not existed null
+// selectByPkGfs id id-file
+// selectByPkGfs u8a.length 1000
+// selectByPkGfs u8a[0..3] 0 1 2 3
+// selectByPkGfs by id not existed null
 // change insertGfs
 // insertGfs multi { n: 2, nInserted: 2, ok: 1 }
 // change delGfs

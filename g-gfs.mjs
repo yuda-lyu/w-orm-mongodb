@@ -49,15 +49,15 @@ async function test() {
     let gr = await wo.insertGfs({ id: 'id-file', u8a: genU8a(50) })
     console.log('insertGfs existed id', gr)
 
-    //selectByIdGfs
-    let gs = await wo.selectByIdGfs('id-file')
-    console.log('selectByIdGfs id', gs.id)
-    console.log('selectByIdGfs u8a.length', gs.u8a.length)
-    console.log('selectByIdGfs u8a[0..3]', gs.u8a[0], gs.u8a[1], gs.u8a[2], gs.u8a[3])
+    //selectByPkGfs
+    let gs = await wo.selectByPkGfs('id-file')
+    console.log('selectByPkGfs id', gs.id)
+    console.log('selectByPkGfs u8a.length', gs.u8a.length)
+    console.log('selectByPkGfs u8a[0..3]', gs.u8a[0], gs.u8a[1], gs.u8a[2], gs.u8a[3])
 
-    //selectByIdGfs by id not existed
-    let gn = await wo.selectByIdGfs('id-not-existed')
-    console.log('selectByIdGfs by id not existed', gn)
+    //selectByPkGfs by id not existed
+    let gn = await wo.selectByPkGfs('id-not-existed')
+    console.log('selectByPkGfs by id not existed', gn)
 
     //insertGfs, 一次插入多筆
     let gm = await wo.insertGfs([
@@ -86,10 +86,10 @@ test()
 // insertGfs { n: 1, nInserted: 1, ok: 1 }
 // change insertGfs
 // insertGfs existed id { n: 1, nInserted: 0, ok: 1 }
-// selectByIdGfs id id-file
-// selectByIdGfs u8a.length 1000
-// selectByIdGfs u8a[0..3] 0 1 2 3
-// selectByIdGfs by id not existed null
+// selectByPkGfs id id-file
+// selectByPkGfs u8a.length 1000
+// selectByPkGfs u8a[0..3] 0 1 2 3
+// selectByPkGfs by id not existed null
 // change insertGfs
 // insertGfs multi { n: 2, nInserted: 2, ok: 1 }
 // change delGfs

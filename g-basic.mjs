@@ -102,13 +102,13 @@ async function test() {
     let sr = await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
     console.log('selectReg', sr)
 
-    //selectById, 由id直接查找單筆, 不需如select提取全部符合數據再處理
-    let sbi = await wo.selectById('id-rosemary')
-    console.log('selectById', sbi)
+    //selectByPk, 由id直接查找單筆, 不需如select提取全部符合數據再處理
+    let sbi = await wo.selectByPk('id-rosemary')
+    console.log('selectByPk', sbi)
 
-    //selectById by id not existed
-    let sbn = await wo.selectById('id-not-existed')
-    console.log('selectById by id not existed', sbn)
+    //selectByPk by id not existed
+    let sbn = await wo.selectByPk('id-not-existed')
+    console.log('selectByPk by id not existed', sbn)
 
     //del
     let d = ss.filter(function(v) {
@@ -165,8 +165,8 @@ test()
 //   }
 // ]
 // selectReg [ { id: 'id-peter', name: 'peter(modify)', value: 123 } ]
-// selectById { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
-// selectById by id not existed null
+// selectByPk { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
+// selectByPk by id not existed null
 // change del
 // del then [ { n: 1, nDeleted: 1, ok: 1 } ]
 

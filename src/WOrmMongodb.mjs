@@ -20,6 +20,9 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
 /**
  * 操作資料庫(MongoDB)
  *
+ * 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。
+ * id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自動補值；del不補值。
+ *
  * @class
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {String} [opt.url='mongodb://127.0.0.1:27017'] 輸入連接資料庫字串，預設'mongodb://127.0.0.1:27017'
@@ -274,19 +277,20 @@ function WOrmMongodb(opt = {}) {
 
 
     /**
-     * 由id查詢單筆數據，因由MongoDB查找且僅回傳單筆，不需如select提取全部符合數據再處理，故數據量大時效能較佳
+     * 由主鍵查詢單筆數據，因由MongoDB查找且僅回傳單筆，不需如select提取全部符合數據再處理，故數據量大時效能較佳
+     * 註: 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定
      * 註: 本函數不得有副作用，故不建立唯一索引
      *
      * @memberOf WOrmMongodb
-     * @param {String} id 輸入id字串
-     * @returns {Promise} 回傳Promise，resolve回傳數據物件，若無此id或id無效則回傳null，reject回傳錯誤訊息
+     * @param {String} pk 輸入主鍵值字串，即數據之id
+     * @returns {Promise} 回傳Promise，resolve回傳數據物件，若無此主鍵或主鍵值無效則回傳null，reject回傳錯誤訊息
      */
-    async function selectById(id) {
+    async function selectByPk(pk) {
         let isErr = false
 
         //check
-        if (!isestr(id)) {
-            //未給有效id視為查無數據, 判定基準與insert、save、del內對id之認定一致
+        if (!isestr(pk)) {
+            //未給有效主鍵值視為查無數據, 判定基準與insert、save、del內對id之認定一致
             return null
         }
 
@@ -302,7 +306,7 @@ function WOrmMongodb(opt = {}) {
             let collection = database.collection(opt.cl)
 
             //findOne, 以投影去除_id, 令回傳形狀與select一致
-            let v = await collection.findOne({ id }, { projection: { _id: 0 } })
+            let v = await collection.findOne({ id: pk }, { projection: { _id: 0 } })
 
             //check, 判定基準與insert、save、del內對既有數據之認定一致
             if (iseobj(v)) {
@@ -909,20 +913,21 @@ function WOrmMongodb(opt = {}) {
 
 
     /**
-     * 使用GridFS，由id查詢單筆數據
-     * 註: 查無數據或id無效時回傳null，判定基準與selectById一致
+     * 使用GridFS，由主鍵查詢單筆數據
+     * 註: 查無數據或主鍵值無效時回傳null，判定基準與selectByPk一致
+     * 註: 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定
      * 本函數不得有副作用，故不建立唯一索引
      *
      * @memberOf WOrmMongodb
-     * @param {String} id 輸入查詢id字串
-     * @returns {Promise} 回傳Promise，resolve回傳數據物件{ id, u8a }，若無此id或id無效則回傳null，reject回傳錯誤訊息
+     * @param {String} pk 輸入主鍵值字串，即數據之id
+     * @returns {Promise} 回傳Promise，resolve回傳數據物件{ id, u8a }，若無此主鍵或主鍵值無效則回傳null，reject回傳錯誤訊息
      */
-    async function selectByIdGfs(id) {
+    async function selectByPkGfs(pk) {
         let isErr = false
 
         //check
-        if (!isestr(id)) {
-            //未給有效id視為查無數據, 判定基準與selectById一致
+        if (!isestr(pk)) {
+            //未給有效主鍵值視為查無數據, 判定基準與selectByPk一致
             return null
         }
 
@@ -979,11 +984,11 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //core
-            let u8a = await core(id)
+            let u8a = await core(pk)
 
             //res, 形狀與insertGfs所收之數據物件一致
             res = {
-                id,
+                id: pk,
                 u8a,
             }
 
@@ -1240,12 +1245,12 @@ function WOrmMongodb(opt = {}) {
 
     //bind
     ee.select = select
-    ee.selectById = selectById
+    ee.selectByPk = selectByPk
     ee.insert = insert
     ee.save = save
     ee.del = del
     ee.delAll = delAll
-    ee.selectByIdGfs = selectByIdGfs
+    ee.selectByPkGfs = selectByPkGfs
     ee.insertGfs = insertGfs
     ee.delGfs = delGfs
     ee.delAllGfs = delAllGfs

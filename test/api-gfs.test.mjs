@@ -139,10 +139,10 @@ describe('gfs basic', function() {
         // vans[3] = { files: 1, chunks: 2 }
         vget[3] = await countDocs(cl)
 
-        //selectByIdGfs, 取回內容須與來源逐位元組相同, 且形狀與insertGfs所收之數據物件一致
+        //selectByPkGfs, 取回內容須與來源逐位元組相同, 且形狀與insertGfs所收之數據物件一致
         rt = null
         // vans[4] = { keys: 'id,u8a', id: 'g-big', length: nSize, hash, b0: 0, b1: 1, b255: 255, b256: 0 }
-        await wo.selectByIdGfs('g-big')
+        await wo.selectByPkGfs('g-big')
             .then(function(msg) {
                 rt = {
                     keys: genKeys(msg),
@@ -160,10 +160,10 @@ describe('gfs basic', function() {
             })
         vget[4] = rt
 
-        //selectByIdGfs by id not existed
+        //selectByPkGfs by id not existed
         rt = null
         // vans[5] = null
-        await wo.selectByIdGfs('id-not-existed')
+        await wo.selectByPkGfs('id-not-existed')
             .then(function(msg) {
                 rt = msg
             })
@@ -172,12 +172,12 @@ describe('gfs basic', function() {
             })
         vget[5] = rt
 
-        //selectByIdGfs by id invalid, 未給有效id視為查無數據
+        //selectByPkGfs by id invalid, 未給有效id視為查無數據
         // vans[6] = [null, null, null]
         vget[6] = [
-            await wo.selectByIdGfs(''),
-            await wo.selectByIdGfs(123),
-            await wo.selectByIdGfs(null),
+            await wo.selectByPkGfs(''),
+            await wo.selectByPkGfs(123),
+            await wo.selectByPkGfs(null),
         ]
 
         //insertGfs未給id時自動產生
@@ -284,17 +284,17 @@ describe('gfs basic', function() {
         b255: 255,
         b256: 0,
     }
-    it(`should get same content for selectByIdGfs`, async function() {
+    it(`should get same content for selectByPkGfs`, async function() {
         assert.strict.deepStrictEqual(vget[4], vans[4])
     })
 
     vans[5] = null
-    it(`should get ${JSON.stringify(vans[5])} for selectByIdGfs by id not existed`, async function() {
+    it(`should get ${JSON.stringify(vans[5])} for selectByPkGfs by id not existed`, async function() {
         assert.strict.deepStrictEqual(vget[5], vans[5])
     })
 
     vans[6] = [null, null, null]
-    it(`should get ${JSON.stringify(vans[6])} for selectByIdGfs by id invalid`, async function() {
+    it(`should get ${JSON.stringify(vans[6])} for selectByPkGfs by id invalid`, async function() {
         assert.strict.deepStrictEqual(vget[6], vans[6])
     })
 
@@ -395,7 +395,7 @@ describe('gfs insert', function() {
         vget[3] = { files: c2.files - c1.files, chunks: c2.chunks - c1.chunks }
 
         //已存在id不得被覆寫, 內容須為首次所給
-        let vi1 = await wo.selectByIdGfs('i1')
+        let vi1 = await wo.selectByPkGfs('i1')
         vget[4] = genHash(vi1.u8a) === genHash(genU8a(100, 1))
 
         //部份重複, 1筆已存在2筆為新
@@ -411,7 +411,7 @@ describe('gfs insert', function() {
             { id: 'i-dup', u8a: genU8a(100, 7) },
             { id: 'i-uniq', u8a: genU8a(100, 8) },
         ])
-        let vdup = await wo.selectByIdGfs('i-dup')
+        let vdup = await wo.selectByPkGfs('i-dup')
         vget[7] = genHash(vdup.u8a) === genHash(genU8a(100, 6))
 
         //併發對同一id插入10次, nInserted總和須為1
@@ -545,7 +545,7 @@ describe('gfs change event', function() {
         })
 
         vget[1] = await wo.insertGfs({ id: 'e1', u8a: genU8a(100, 1) })
-        vget[2] = genHash((await wo.selectByIdGfs('e1')).u8a) === genHash(genU8a(100, 1))
+        vget[2] = genHash((await wo.selectByPkGfs('e1')).u8a) === genHash(genU8a(100, 1))
         vget[3] = await wo.delGfs({ id: 'e1' })
         vget[4] = await wo.delAllGfs()
 
