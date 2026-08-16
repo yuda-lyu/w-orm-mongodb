@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WOrmMongodb.html">WOrmMongodb</a><ul class='methods'><li data-type='method'><a href="WOrmMongodb.html#.del">del</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAll">delAll</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAllGfs">delAllGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.delGfs">delGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.insert">insert</a></li><li data-type='method'><a href="WOrmMongodb.html#.insertGfs">insertGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.save">save</a></li><li data-type='method'><a href="WOrmMongodb.html#.select">select</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectGfs">selectGfs</a></li></ul></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WOrmMongodb.html">WOrmMongodb</a><ul class='methods'><li data-type='method'><a href="WOrmMongodb.html#.del">del</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAll">delAll</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAllGfs">delAllGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.delGfs">delGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.insert">insert</a></li><li data-type='method'><a href="WOrmMongodb.html#.insertGfs">insertGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.save">save</a></li><li data-type='method'><a href="WOrmMongodb.html#.select">select</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectById">selectById</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectByIdGfs">selectByIdGfs</a></li></ul></li></ul>
     
 </nav>
 
@@ -80,7 +80,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line35">line 35</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line30">line 30</a>
     </li></ul></dd>
     
 
@@ -423,13 +423,15 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>刪除數據</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>刪除數據
+註: n為id命中筆數；未帶有效id者視為本筆無法處理，不送查詢條件且以ok為0並附err回報；
+判斷本筆是否真的被刪除一律以nDeleted為準</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line311">line 311</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line644">line 644</a>
     </li></ul></dd>
     
 
@@ -547,7 +549,7 @@
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳與輸入等長之刪除結果陣列，reject回傳錯誤訊息</p>
 </div>
 
 
@@ -584,13 +586,14 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
+註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line386">line 386</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line756">line 756</a>
     </li></ul></dd>
     
 
@@ -762,13 +765,15 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除全部數據，需與delGfs分開，避免未傳數據導致直接刪除全部
+註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果
+本函數不建立唯一索引，以免既有數據尚存重複id時無法清除</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line749">line 749</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1178">line 1178</a>
     </li></ul></dd>
     
 
@@ -930,7 +935,7 @@
 
     
 
-    <h4 class="name" id=".delGfs"><span class="type-signature type-signature-async, static">(async, static) </span>delGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".delGfs"><span class="type-signature type-signature-async, static">(async, static) </span>delGfs<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -940,13 +945,15 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除數據</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除數據
+註: n為id命中筆數；未帶有效id者視為本筆無法處理，以ok為0並附err回報；
+判斷本筆是否真的被刪除一律以nDeleted為準</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line641">line 641</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1050">line 1050</a>
     </li></ul></dd>
     
 
@@ -1018,13 +1025,16 @@
 
         <tr>
             
-                <td class="name"><code>id</code></td>
+                <td class="name"><code>data</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">String</span>
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">Array</span>
 
 
 
@@ -1035,7 +1045,7 @@
 
             
 
-            <td class="description last"><p>輸入刪除id字串</p></td>
+            <td class="description last"><p>輸入數據物件或陣列，各數據物件須帶id</p></td>
         </tr>
 
     
@@ -1061,7 +1071,7 @@
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳與輸入等長之刪除結果陣列，reject回傳錯誤訊息</p>
 </div>
 
 
@@ -1098,13 +1108,15 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>插入數據，插入同樣數據會自動產生不同_id，故insert前需自行判斷有無重複</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
+由MongoDB於唯一索引上原子完成[檢查id未存在]與[寫入]，併發時同一id僅有一次成功
+註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line119">line 119</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line342">line 342</a>
     </li></ul></dd>
     
 
@@ -1249,7 +1261,7 @@
 
     
 
-    <h4 class="name" id=".insertGfs"><span class="type-signature type-signature-async, static">(async, static) </span>insertGfs<span class="signature">(u8a)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".insertGfs"><span class="type-signature type-signature-async, static">(async, static) </span>insertGfs<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1259,13 +1271,15 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，插入數據，需為Uint8Array格式</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
+數據物件形狀為{ id, u8a }，id未給時自動產生，u8a須為Uint8Array
+註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line440">line 440</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line814">line 814</a>
     </li></ul></dd>
     
 
@@ -1337,13 +1351,16 @@
 
         <tr>
             
-                <td class="name"><code>u8a</code></td>
+                <td class="name"><code>data</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">Uint8Array</span>
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">Array</span>
 
 
 
@@ -1354,7 +1371,7 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last"><p>輸入數據物件或陣列，各數據物件形狀為{ id, u8a }</p></td>
         </tr>
 
     
@@ -1417,13 +1434,15 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>儲存數據</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>儲存數據，以id為準更新既有數據，未給之欄位會保留；id不存在且option.autoInsert為true時改為插入
+註: n為id命中筆數，命中或經插入而產生皆為1；[內容相同]之判定基準為將待儲存物件合併進現值後結果與現值相同，
+相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line211">line 211</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line564">line 564</a>
     </li></ul></dd>
     
 
@@ -1667,7 +1686,7 @@
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳儲存結果，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳與輸入等長之儲存結果陣列，reject回傳錯誤訊息</p>
 </div>
 
 
@@ -1710,7 +1729,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line65">line 65</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line233">line 233</a>
     </li></ul></dd>
     
 
@@ -1845,7 +1864,7 @@
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳數據，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳數據陣列，無符合數據回傳空陣列，reject回傳錯誤訊息</p>
 </div>
 
 
@@ -1872,7 +1891,7 @@
 
     
 
-    <h4 class="name" id=".selectGfs"><span class="type-signature type-signature-async, static">(async, static) </span>selectGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".selectById"><span class="type-signature type-signature-async, static">(async, static) </span>selectById<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1882,13 +1901,174 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，查詢數據</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>由id查詢單筆數據，因由MongoDB查找且僅回傳單筆，不需如select提取全部符合數據再處理，故數據量大時效能較佳
+註: 本函數不得有副作用，故不建立唯一索引</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line528">line 528</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line284">line 284</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5 class="h5-parameters">Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>輸入id字串</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5 class="h5-returns">Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>回傳Promise，resolve回傳數據物件，若無此id或id無效則回傳null，reject回傳錯誤訊息</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id=".selectByIdGfs"><span class="type-signature type-signature-async, static">(async, static) </span>selectByIdGfs<span class="signature">(id)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，由id查詢單筆數據
+註: 查無數據或id無效時回傳null，判定基準與selectById一致
+本函數不得有副作用，故不建立唯一索引</p></li></ul></dd>
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line920">line 920</a>
     </li></ul></dd>
     
 
@@ -2003,7 +2183,7 @@
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳數據，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳數據物件{ id, u8a }，若無此id或id無效則回傳null，reject回傳錯誤訊息</p>
 </div>
 
 
@@ -2045,7 +2225,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sat Aug 08 2026 14:31:31 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Aug 16 2026 22:37:44 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
