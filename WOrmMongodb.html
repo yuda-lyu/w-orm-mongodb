@@ -75,14 +75,15 @@
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>操作資料庫(MongoDB)</p>
-<p>本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。
-id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自動補值；del不補值。</p></li></ul></dd>
+<p>本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。id為無業務語義之識別碼。
+opt.autoGenPk預設為true，insert、save與insertGfs於輸入未帶有效id時自動產生；del於任一設定下皆不補值。
+opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line33">line 33</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line36">line 36</a>
     </li></ul></dd>
     
 
@@ -338,6 +339,46 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
         </tr>
 
     
+
+        <tr>
+            
+                <td class="name"><code>autoGenPk</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>true</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入是否於輸入未帶有效主鍵時自動產生主鍵值，預設true。為false時主鍵須由呼叫端自備，屬依賴注入之定位，主鍵之唯一性、格式與是否與既有資料衝突皆由呼叫端自負。本設定為建構層設定，不得於insert與save之option逐次覆寫</p></td>
+        </tr>
+
+    
     </tbody>
 </table>
 
@@ -433,7 +474,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line648">line 648</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line681">line 681</a>
     </li></ul></dd>
     
 
@@ -595,7 +636,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line760">line 760</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line793">line 793</a>
     </li></ul></dd>
     
 
@@ -775,7 +816,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1183">line 1183</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1215">line 1215</a>
     </li></ul></dd>
     
 
@@ -955,7 +996,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1055">line 1055</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1087">line 1087</a>
     </li></ul></dd>
     
 
@@ -1112,13 +1153,14 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
 由MongoDB於唯一索引上原子完成[檢查id未存在]與[寫入]，併發時同一id僅有一次成功
-註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果</p></li></ul></dd>
+註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line346">line 346</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line388">line 388</a>
     </li></ul></dd>
     
 
@@ -1274,14 +1316,15 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
-數據物件形狀為{ id, u8a }，id未給時自動產生，u8a須為Uint8Array
-註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果</p></li></ul></dd>
+數據物件形狀為{ id, u8a }，u8a須為Uint8Array
+註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line818">line 818</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line852">line 852</a>
     </li></ul></dd>
     
 
@@ -1438,13 +1481,14 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>儲存數據，以id為準更新既有數據，未給之欄位會保留；id不存在且option.autoInsert為true時改為插入
 註: n為id命中筆數，命中或經插入而產生皆為1；[內容相同]之判定基準為將待儲存物件合併進現值後結果與現值相同，
-相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報</p></li></ul></dd>
+相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報
+註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line568">line 568</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line606">line 606</a>
     </li></ul></dd>
     
 
@@ -1731,7 +1775,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line236">line 236</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line277">line 277</a>
     </li></ul></dd>
     
 
@@ -1911,7 +1955,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line288">line 288</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line329">line 329</a>
     </li></ul></dd>
     
 
@@ -2072,7 +2116,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line925">line 925</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line957">line 957</a>
     </li></ul></dd>
     
 
@@ -2229,7 +2273,7 @@ id為無業務語義之識別碼，故insert與save於輸入未帶有效id時自
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Aug 16 2026 23:36:47 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Aug 17 2026 07:33:48 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
