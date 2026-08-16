@@ -98,9 +98,17 @@ async function test() {
     let spc = await wo.select({ '$or': [{ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] }, { '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 400 } }] }] })
     console.log('select by $or, $and, $ne, $in, $nin', spc)
 
-    //select by regex
-    let sr = await wo.select({ name: { $regex: 'PeT', $options: '$i' } })
+    //select by regex, $options之合法flag僅有i、m、x、s
+    let sr = await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
     console.log('selectReg', sr)
+
+    //selectById, 由id直接查找單筆, 不需如select提取全部符合數據再處理
+    let sbi = await wo.selectById('id-rosemary')
+    console.log('selectById', sbi)
+
+    //selectById by id not existed
+    let sbn = await wo.selectById('id-not-existed')
+    console.log('selectById by id not existed', sbn)
 
     //del
     let d = ss.filter(function(v) {
@@ -117,14 +125,14 @@ async function test() {
 }
 test()
 // change delAll
-// delAll then { n: 2, nDeleted: 2, ok: 1 }
+// delAll then { n: 0, nDeleted: 0, ok: 1 }
 // change insert
 // insert then { n: 3, nInserted: 3, ok: 1 }
 // change save
 // save then [
-//   { n: 1, nModified: 1, ok: 1 },
-//   { n: 1, nModified: 1, ok: 1 },
-//   { n: 0, nModified: 0, ok: 1 }
+//   { n: 1, nInserted: 0, nModified: 1, ok: 1 },
+//   { n: 1, nInserted: 0, nModified: 1, ok: 1 },
+//   { n: 0, nInserted: 0, nModified: 0, ok: 1 }
 // ]
 // select all [
 //   { id: 'id-peter', name: 'peter(modify)', value: 123 },
@@ -157,6 +165,8 @@ test()
 //   }
 // ]
 // selectReg [ { id: 'id-peter', name: 'peter(modify)', value: 123 } ]
+// selectById { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
+// selectById by id not existed null
 // change del
 // del then [ { n: 1, nDeleted: 1, ok: 1 } ]
 

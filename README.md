@@ -9,7 +9,7 @@ An operator for mongodb in nodejs.
 [![jsdelivr download](https://img.shields.io/jsdelivr/npm/hm/w-orm-mongodb.svg)](https://www.jsdelivr.com/package/npm/w-orm-mongodb)
 
 ## Documentation
-To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-orm-mongodb/WOrm.html).
+To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-orm-mongodb/WOrmMongodb.html).
 
 ## Installation
 
@@ -120,9 +120,17 @@ async function test() {
     let spc = await wo.select({ '$or': [{ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] }, { '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 400 } }] }] })
     console.log('select by $or, $and, $ne, $in, $nin', spc)
 
-    //select by regex
-    let sr = await wo.select({ name: { $regex: 'PeT', $options: '$i' } })
+    //select by regex, $options之合法flag僅有i、m、x、s
+    let sr = await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
     console.log('selectReg', sr)
+
+    //selectById, 由id直接查找單筆, 不需如select提取全部符合數據再處理
+    let sbi = await wo.selectById('id-rosemary')
+    console.log('selectById', sbi)
+
+    //selectById by id not existed
+    let sbn = await wo.selectById('id-not-existed')
+    console.log('selectById by id not existed', sbn)
 
     //del
     let d = ss.filter(function(v) {
@@ -139,14 +147,14 @@ async function test() {
 }
 test()
 // change delAll
-// delAll then { n: 2, nDeleted: 2, ok: 1 }
+// delAll then { n: 0, nDeleted: 0, ok: 1 }
 // change insert
 // insert then { n: 3, nInserted: 3, ok: 1 }
 // change save
 // save then [
-//   { n: 1, nModified: 1, ok: 1 },
-//   { n: 1, nModified: 1, ok: 1 },
-//   { n: 0, nModified: 0, ok: 1 }
+//   { n: 1, nInserted: 0, nModified: 1, ok: 1 },
+//   { n: 1, nInserted: 0, nModified: 1, ok: 1 },
+//   { n: 0, nInserted: 0, nModified: 0, ok: 1 }
 // ]
 // select all [
 //   { id: 'id-peter', name: 'peter(modify)', value: 123 },
@@ -179,22 +187,205 @@ test()
 //   }
 // ]
 // selectReg [ { id: 'id-peter', name: 'peter(modify)', value: 123 } ]
+// selectById { id: 'id-rosemary', name: 'rosemary(modify)', value: 123.456 }
+// selectById by id not existed null
 // change del
 // del then [ { n: 1, nDeleted: 1, ok: 1 } ]
 ```
 
-#### Example for GridFS
-> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-gfs.mjs)]
+## Return values
+
+本套件屬`w-orm-*`系列，六個函數`select`、`selectById`、`insert`、`save`、`del`、`delAll`之回傳結構依系列統一規格：
+
 ```alias
-import path from 'path'
-import fs from 'fs'
+select(find)        → [ {...}, {...} ]                    無符合為 []
+selectById(id)      → {...} | null
+
+insert(data)        → { n, nInserted, ok }
+save(data, option)  → [ { n, nInserted, nModified, ok }, ... ]
+del(data)           → [ { n, nDeleted, ok }, ... ]
+delAll(find)        → { n, nDeleted, ok }
+
+單筆失敗            → { ..., ok: 0, err: '...' }          僅 save、del
+整批失敗            → Promise.reject(err)
+```
+
+各計數欄位之語義：
+
+| 欄位 | 語義 |
+|---|---|
+| `n` | `insert`為輸入筆數；`save`與`del`為id命中筆數(`0`或`1`)；`delAll`為實際刪除筆數 |
+| `nInserted` | 實際插入筆數 |
+| `nModified` | 實際更新筆數。合併後內容與現值相同而未寫入者為`0` |
+| `nDeleted` | 實際刪除筆數 |
+| `ok` | `1`成功、`0`該筆失敗 |
+| `err` | 失敗訊息，僅於`ok`為`0`時出現 |
+
+判讀準則：
+
+| 要判斷什麼 | 看什麼 |
+|---|---|
+| 這批有幾筆是新資料 | `insert`之`nInserted` |
+| 這筆是不是新資料 | `save`之`nInserted === 1` |
+| 這筆內容有沒有實際寫入 | `save`之`nModified === 1` |
+| 這筆有沒有真的被刪 | `nDeleted` |
+| 整批有沒有失敗 | Promise是否`reject` |
+| 個別筆有沒有失敗 | 逐筆之`ok === 0`，訊息取`err` |
+
+`save`之「內容相同」判定基準為**將待儲存物件合併進現值之後，結果與現值相同**，由MongoDB於伺服器端逐欄位比對。故僅給部份欄位且該些欄位值皆與現值相同時，`nModified`亦為`0`。
+
+`del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
+
+## Concurrency
+
+`insert`之「已存在則跳過」與`save`之「不遺失更新」，由MongoDB於單一文件操作內原子完成，**不須開啟transaction**（transaction另須replica set，standalone不支援）。
+
+| 適用範圍 | 是否保證 |
+|---|---|
+| 單一行程內併發 | 是 |
+| 跨行程併發 | 是 |
+
+原子性全由MongoDB伺服器端提供，本套件每次操作各自建立連線、不持有跨呼叫狀態，故兩種範圍之保證相同。
+
+實測依據（Windows 11 / Node.js 24.19.0 / mongodb driver 7.5.0 / MongoDB 8 單機）：
+
+- 單一行程內對同一`id`併發`insert` 10次，`nInserted`總和為`1`，資料表僅`1`筆。
+- 單一行程內對同一全新`id`併發`save` 5次，`nInserted === 1`者恰`1`筆，資料表僅`1`筆，5次所給欄位全數保留。
+- 跨行程（2個獨立node行程）各自對相同20個`id`執行`insert`，`nInserted`總和為`20`，資料表恰`20`筆。
+- 跨行程（2個獨立node行程）各自對同一既有`id`寫入20個不同欄位，40個欄位全數保留且原欄位未遺失，資料表恰`1`筆。
+
+GridFS亦同（`test/api-gfs.test.mjs`）：
+
+- 對同一`id`併發`insertGfs` 10次，`nInserted`總和為`1`，僅新增1筆files且**未殘留孤兒chunks**。
+
+以上皆為測試案例，可以`npm test`複現。
+
+`delAll`之`nDeleted`於併發下反映該次`deleteMany`實際刪除筆數，不保證等於呼叫當下符合條件之筆數。
+
+## Upgrading
+
+本套件會於`id`欄位建立唯一索引，此為`insert`之「已存在則跳過」與`save`之「不遺失更新」所必需，無法關閉。**若既有資料表內已存在重複`id`，建立索引會失敗，`insert`與`save`會直接`reject`。** 升級前請先清除重複數據：
+
+```alias
+// 找出重複id
+db.users.aggregate([
+    { $group: { _id: '$id', n: { $sum: 1 } } },
+    { $match: { n: { $gt: 1 } } },
+])
+```
+
+清除重複數據後即可正常使用。索引僅於首次寫入時建立一次，已存在同樣索引時MongoDB不會重建亦不報錯。
+
+GridFS同理，`insertGfs`會於`<cl>.files`之`filename`欄位建立唯一索引：
+
+```alias
+// 找出重複id
+db['usersGfs.files'].aggregate([
+    { $group: { _id: '$filename', n: { $sum: 1 } } },
+    { $match: { n: { $gt: 1 } } },
+])
+```
+
+`selectByIdGfs`、`delGfs`、`delAllGfs`皆不建立索引，故既有數據縱使尚存重複`id`亦可正常查詢與清除，`delGfs`會將同一`id`之多筆一併刪除並如實回報`nDeleted`。
+
+#### Example for unique id and concurrency
+> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-unique.mjs)]
+
+```alias
 import WOrm from './src/WOrmMongodb.mjs'
 //import WOrm from './dist/w-orm-mongodb.umd.js'
 
 let opt = {
     url: 'mongodb://username:password@127.0.0.1:27017',
     db: 'worm',
+    cl: 'usersUnique',
+}
+
+async function test() {
+
+    //wo
+    let wo = WOrm(opt)
+
+    //delAll
+    await wo.delAll()
+
+    //insert, 同批含重複id時僅首筆成功
+    let ri = await wo.insert([
+        { id: 'id-dup', name: 'dup-1' },
+        { id: 'id-dup', name: 'dup-2' },
+        { id: 'id-uniq', name: 'uniq' },
+    ])
+    console.log('insert with duplicated id', ri)
+    console.log('selectById(id-dup)', await wo.selectById('id-dup'))
+
+    //insert, 對已存在id再插入則跳過而不覆寫
+    let re = await wo.insert({ id: 'id-dup', name: 'dup-3' })
+    console.log('insert existed id', re)
+    console.log('selectById(id-dup)', await wo.selectById('id-dup'))
+
+    //insert, 併發對同一id插入10次, nInserted總和為1
+    let rc = await Promise.all(Array.from({ length: 10 }, (v, k) => {
+        return wo.insert({ id: 'id-race', k })
+    }))
+    console.log('sum of nInserted by 10 concurrent insert', rc.reduce((sum, v) => sum + v.nInserted, 0))
+    console.log('records of id-race', (await wo.select({ id: 'id-race' })).length)
+
+    //save, 併發對同一全新id儲存不同欄位, 僅一次為插入, 各欄位皆保留
+    let rs = await Promise.all(Array.from({ length: 5 }, (v, k) => {
+        return wo.save({ id: 'id-new', [`f${k}`]: k })
+    }))
+    console.log('count of nInserted===1 by 5 concurrent save', rs.filter((v) => v[0].nInserted === 1).length)
+    console.log('records of id-new', (await wo.select({ id: 'id-new' })).length)
+    console.log('selectById(id-new)', await wo.selectById('id-new'))
+
+}
+test()
+// insert with duplicated id { n: 3, nInserted: 2, ok: 1 }
+// selectById(id-dup) { id: 'id-dup', name: 'dup-1' }
+// insert existed id { n: 1, nInserted: 0, ok: 1 }
+// selectById(id-dup) { id: 'id-dup', name: 'dup-1' }
+// sum of nInserted by 10 concurrent insert 1
+// records of id-race 1
+// count of nInserted===1 by 5 concurrent save 1
+// records of id-new 1
+// selectById(id-new) { id: 'id-new', f0: 0, f1: 1, f2: 2, f4: 4, f3: 3 }
+// 註: 併發儲存之各欄位皆會保留, 惟欄位順序取決於各次儲存之完成順序, 故每次執行不盡相同
+```
+
+#### Example for GridFS
+> **Link:** [[dev source code](https://github.com/yuda-lyu/w-orm-mongodb/blob/master/g-gfs.mjs)]
+
+GridFS函數之參數與回傳形狀比照一般操作，數據物件為`{ id, u8a }`：
+
+| GridFS函數 | 對應一般函數 | 回傳 |
+|---|---|---|
+| `selectByIdGfs(id)` | `selectById` | `{ id, u8a }` 或 `null` |
+| `insertGfs(data)` | `insert` | `{ n, nInserted, ok }` |
+| `delGfs(data)` | `del` | `[ { n, nDeleted, ok }, ... ]` |
+| `delAllGfs(find)` | `delAll` | `{ n, nDeleted, ok }` |
+
+`insertGfs`同樣具備「已存在則跳過」語義，以`<cl>.files`之`filename`唯一索引達成，升級前提與一般操作相同。GridFS無法於單一原子操作內取代既有內容，故不提供`saveGfs`，更新請以`delGfs`後再`insertGfs`完成。
+
+```alias
+import WOrm from './src/WOrmMongodb.mjs'
+//import WOrm from './dist/w-orm-mongodb.umd.js'
+
+
+//GridFS函數之參數與回傳形狀比照一般操作:
+//數據物件為{ id, u8a }, insertGfs收物件或陣列, delGfs收物件或陣列並回傳等長陣列
+let opt = {
+    url: 'mongodb://username:password@127.0.0.1:27017',
+    db: 'worm',
     cl: 'usersGfs',
+}
+
+//genU8a, 產生內容可複現之測試數據
+function genU8a(n) {
+    let u8a = new Uint8Array(n)
+    for (let i = 0; i < n; i++) {
+        u8a[i] = i % 256
+    }
+    return u8a
 }
 
 async function test() {
@@ -207,23 +398,8 @@ async function test() {
         console.log('change', mode)
     })
 
-    //fn_in, fn_out
-    let fn_in = path.resolve('../', './_data', 'data(in).dat')
-    let fn_out = path.resolve('../', './_data', 'data(out).dat')
-    // console.log('fn_in', fn_in)
-    // console.log('fn_out', fn_out)
-
-    //unlinkSync
-    try {
-        fs.unlinkSync(fn_out)
-    }
-    catch (err) {}
-
-    //u8a
-    let b = await fs.readFileSync(fn_in)
-    let u8a = new Uint8Array(b)
-    // let u8a = new Uint8Array([66, 97, 115]) //Uint8Array data from nodejs or browser
-    console.log('u8a', u8a)
+    //u8a, 亦可為瀏覽器或nodejs取得之任何Uint8Array
+    let u8a = genU8a(1000)
 
     //delAllGfs
     await wo.delAllGfs()
@@ -235,54 +411,61 @@ async function test() {
         })
 
     //insertGfs
-    let gi = await wo.insertGfs(u8a)
+    let gi = await wo.insertGfs({ id: 'id-file', u8a })
     console.log('insertGfs', gi)
 
-    //selectGfs
-    let gs = await wo.selectGfs(gi.id)
-    console.log('selectGfs', gs)
-    console.log('gs[0]', gs[0], gs[0] === 0)
-    console.log('gs[1]', gs[1], gs[1] === 0)
-    console.log('gs[2]', gs[2], gs[2] === 0)
-    console.log('gs[3]', gs[3], gs[3] === 24)
-    console.log('gs[4]', gs[4], gs[4] === 102)
-    console.log('gs.length', gs.length, gs.length === 47381362)
-    fs.writeFileSync(fn_out, gs)
+    //insertGfs, 已存在id者跳過且不覆寫
+    let gr = await wo.insertGfs({ id: 'id-file', u8a: genU8a(50) })
+    console.log('insertGfs existed id', gr)
+
+    //selectByIdGfs
+    let gs = await wo.selectByIdGfs('id-file')
+    console.log('selectByIdGfs id', gs.id)
+    console.log('selectByIdGfs u8a.length', gs.u8a.length)
+    console.log('selectByIdGfs u8a[0..3]', gs.u8a[0], gs.u8a[1], gs.u8a[2], gs.u8a[3])
+
+    //selectByIdGfs by id not existed
+    let gn = await wo.selectByIdGfs('id-not-existed')
+    console.log('selectByIdGfs by id not existed', gn)
+
+    //insertGfs, 一次插入多筆
+    let gm = await wo.insertGfs([
+        { id: 'id-a', u8a: genU8a(10) },
+        { id: 'id-b', u8a: genU8a(20) },
+    ])
+    console.log('insertGfs multi', gm)
 
     //delGfs
-    let gd = await wo.delGfs(gi.id)
+    let gd = await wo.delGfs({ id: 'id-file' })
     console.log('delGfs', gd)
+
+    //delGfs by id not existed
+    let gdn = await wo.delGfs({ id: 'id-not-existed' })
+    console.log('delGfs by id not existed', gdn)
+
+    //delAllGfs
+    let gda = await wo.delAllGfs()
+    console.log('delAllGfs', gda)
 
 }
 test()
-// u8a Uint8Array(47381362) [
-//     0,   0,   0,  24, 102, 116, 121, 112, 109, 112, 52,  50,
-//     0,   0,   0,   0, 105, 115, 111, 109, 109, 112, 52,  50,
-//     0,   2,  14,  73, 109, 111, 111, 118,   0,   0,  0, 108,
-//   109, 118, 104, 100,   0,   0,   0,   0, 214,  15, 24, 167,
-//   214,  15,  24, 167,   0,   1,  95, 144,   1, 106, 95,  88,
-//     0,   1,   0,   0,   1,   0,   0,   0,   0,   0,  0,   0,
-//     0,   0,   0,   0,   0,   1,   0,   0,   0,   0,  0,   0,
-//     0,   0,   0,   0,   0,   0,   0,   0,   0,   1,  0,   0,
-//     0,   0,   0,   0,
-//   ... 47381262 more items
-// ]
 // change delAllGfs
-// delAllGfs then { n: 0, ok: 1 }
+// delAllGfs then { n: 0, nDeleted: 0, ok: 1 }
 // change insertGfs
-// insertGfs { n: 1, ok: 1, id: {random id} }
-// selectGfs Uint8Array(47381362) [
-//     0,   0,   0,  24, 102, 116, 121, 112, 109, 112, 52,  50,
-//     0,   0,   0,   0, 105, 115, 111, 109, 109, 112, 52,  50,
-//     0,   2,  14,  73, 109, 111, 111, 118,   0,   0,  0, 108,
-//   109, 118, 104, 100,   0,   0,   0,   0, 214,  15, 24, 167,
-//   214,  15,  24, 167,   0,   1,  95, 144,   1, 106, 95,  88,
-//     0,   1,   0,   0,   1,   0,   0,   0,   0,   0,  0,   0,
-//     0,   0,   0,   0,   0,   1,   0,   0,   0,   0,  0,   0,
-//     0,   0,   0,   0,   0,   0,   0,   0,   0,   1,  0,   0,
-//     0,   0,   0,   0,
-//   ... 47381262 more items
-// ]
+// insertGfs { n: 1, nInserted: 1, ok: 1 }
+// change insertGfs
+// insertGfs existed id { n: 1, nInserted: 0, ok: 1 }
+// selectByIdGfs id id-file
+// selectByIdGfs u8a.length 1000
+// selectByIdGfs u8a[0..3] 0 1 2 3
+// selectByIdGfs by id not existed null
+// change insertGfs
+// insertGfs multi { n: 2, nInserted: 2, ok: 1 }
 // change delGfs
-// delGfs { n: 1, nDeleted: 1, ok: 1 }
+// delGfs [ { n: 1, nDeleted: 1, ok: 1 } ]
+// change delGfs
+// delGfs by id not existed [ { n: 0, nDeleted: 0, ok: 1 } ]
+// change delAllGfs
+// delAllGfs { n: 2, nDeleted: 2, ok: 1 }
+
 ```
