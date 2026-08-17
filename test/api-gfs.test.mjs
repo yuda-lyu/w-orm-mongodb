@@ -660,6 +660,113 @@ describe('gfs autoGenPk', function() {
 })
 
 
+describe('gfs error event', function() {
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(300000)
+
+        //collect, 收集事件
+        let collect = (wo) => {
+            let evs = []
+            wo.on('error', function(mode, data, err) {
+                evs.push({ mode, data, err })
+            })
+            return evs
+        }
+
+        //insertGfs之整批性錯誤
+        let woB = WOrm(genOptPk('everrGfs', false))
+        await woB.delAllGfs()
+        let evsB = collect(woB)
+        let msgB = null
+        await woB.insertGfs({ u8a: genU8a(100, 1) }).catch((err) => {
+            msgB = err.toString()
+        })
+        vget[1] = evsB.length
+        vget[2] = evsB[0].mode
+        vget[3] = typeof evsB[0].err === 'string' && msgB.indexOf(evsB[0].err) >= 0
+
+        //delGfs之逐筆失敗, 未帶有效id者亦須發出
+        let woD = WOrm(genOpt('everrDelGfs'))
+        await woD.delAllGfs()
+        await woD.insertGfs({ id: 'd1', u8a: genU8a(100, 2) })
+        let evsD = collect(woD)
+        let rd = await woD.delGfs([{ id: 'd1' }, { u8a: genU8a(10) }])
+        vget[4] = evsD.length
+        vget[5] = evsD[0].mode
+        vget[6] = evsD[0].err === rd[1].err
+
+        //正常結果不得發出error
+        let woN = WOrm(genOpt('everrNormalGfs'))
+        await woN.delAllGfs()
+        let evsN = collect(woN)
+        await woN.insertGfs({ id: 'n1', u8a: genU8a(100, 3) })
+        await woN.insertGfs({ id: 'n1', u8a: genU8a(100, 3) }) //已存在則跳過
+        await woN.delGfs({ id: 'n-not-existed' }) //主鍵未命中
+        await woN.delAllGfs({ filename: 'not-existed' }) //條件無命中
+        await woN.selectByPkGfs('n-not-existed') //查無數據
+        await woN.selectByPkGfs('') //主鍵值無效
+        vget[7] = evsN.length
+
+        //訂閱函數拋錯不得影響本次操作之結果
+        let woT = WOrm(genOpt('everrThrowGfs'))
+        await woT.delAllGfs()
+        woT.on('error', function() {
+            throw new Error('訂閱者拋錯')
+        })
+        await woT.insertGfs({ id: 't1', u8a: genU8a(100, 4) })
+        vget[8] = await woT.delGfs([{ id: 't1' }, { u8a: genU8a(10) }])
+
+    })
+
+    vans[1] = 1
+    it(`should get ${JSON.stringify(vans[1])} for count of error event in insertGfs batch error`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = 'insertGfs'
+    it(`should get ${JSON.stringify(vans[2])} for mode of error event in insertGfs batch error`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = true
+    it(`should get ${JSON.stringify(vans[3])} for same err between error event and reject`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+    vans[4] = 1
+    it(`should get ${JSON.stringify(vans[4])} for count of error event in delGfs single failure`, async function() {
+        assert.strict.deepStrictEqual(vget[4], vans[4])
+    })
+
+    vans[5] = 'delGfs'
+    it(`should get ${JSON.stringify(vans[5])} for mode of error event in delGfs single failure`, async function() {
+        assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+    vans[6] = true
+    it(`should get ${JSON.stringify(vans[6])} for same err between error event and result of delGfs`, async function() {
+        assert.strict.deepStrictEqual(vget[6], vans[6])
+    })
+
+    vans[7] = 0
+    it(`should get ${JSON.stringify(vans[7])} for count of error event in normal results`, async function() {
+        assert.strict.deepStrictEqual(vget[7], vans[7])
+    })
+
+    vans[8] = [
+        { n: 1, nDeleted: 1, ok: 1 },
+        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }
+    ]
+    it(`should get ${JSON.stringify(vans[8])} for result with throwing error listener`, async function() {
+        assert.strict.deepStrictEqual(vget[8], vans[8])
+    })
+
+})
+
+
 describe('gfs change event', function() {
     let vans = {}
     let vget = {}

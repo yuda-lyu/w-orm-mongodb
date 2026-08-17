@@ -1087,6 +1087,251 @@ describe('delAll', function() {
 })
 
 
+describe('error event', function() {
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(120000)
+
+        //collect, 收集事件
+        let collect = (wo) => {
+            let evs = []
+            wo.on('error', function(mode, data, err) {
+                evs.push({ mode, data, err })
+            })
+            return evs
+        }
+
+        //整批性錯誤須於reject前發出, 且err與reject訊息一致
+        let woB = WOrm(genOptPk('everrbatch', false))
+        await woB.delAll()
+        let evsB = collect(woB)
+        let msgB = null
+        await woB.insert({ name: 'no-id' }).catch((err) => {
+            msgB = err.toString()
+        })
+        vget[1] = evsB.length
+        vget[2] = evsB[0].mode
+        vget[3] = typeof evsB[0].err
+        vget[4] = msgB.indexOf(evsB[0].err) >= 0
+
+        //save之整批性錯誤
+        evsB.length = 0
+        await woB.save({ name: 'no-id' }).catch(() => {})
+        vget[5] = evsB.map((v) => v.mode)
+
+        //逐筆失敗須於該筆定案後發出, 每筆一次, err與該筆err欄位一致
+        let woS = WOrm(genOpt('everrsave'))
+        await woS.delAll()
+        await woS.insert([{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }])
+        let evsS = collect(woS)
+        let rs = await woS.save([
+            { id: 'f1', name: 'ok1' },
+            { id: 'f2', $bad: 1 },
+            { id: 'f3', name: 'ok3' },
+        ])
+        vget[6] = evsS.length
+        vget[7] = evsS[0].mode
+        vget[8] = evsS[0].err === rs[1].err
+
+        //del之逐筆失敗, 未帶有效id者亦須發出
+        let woD = WOrm(genOpt('everrdel'))
+        await woD.delAll()
+        await woD.insert({ id: 'd1' })
+        let evsD = collect(woD)
+        let rd = await woD.del([{ id: 'd1' }, { name: 'no-id' }])
+        vget[9] = evsD.length
+        vget[10] = evsD[0].mode
+        vget[11] = evsD[0].err === rd[1].err
+
+        //正常結果不得發出error
+        let woN = WOrm(genOpt('everrnormal'))
+        await woN.delAll()
+        let evsN = collect(woN)
+        await woN.insert({ id: 'n1', name: 'a' })
+        await woN.insert({ id: 'n1', name: 'a' }) //全數已存在
+        await woN.save({ id: 'n1', name: 'a' }) //合併後內容相同
+        await woN.del({ id: 'n-not-existed' }) //主鍵未命中
+        await woN.delAll({ name: 'not-existed' }) //條件無命中
+        await woN.selectByPk('n-not-existed') //查無數據
+        await woN.selectByPk('') //主鍵值無效
+        await woN.select({ name: 'not-existed' }) //無符合數據
+        vget[12] = evsN.length
+
+        //同批既有逐筆失敗又整批resolve時, 逐筆error先於整批change
+        let woO = WOrm(genOpt('everrorder'))
+        await woO.delAll()
+        await woO.insert([{ id: 'o1' }, { id: 'o2' }])
+        let seq = []
+        woO.on('error', function(mode) {
+            seq.push(`error:${mode}`)
+        })
+        woO.on('change', function(mode) {
+            seq.push(`change:${mode}`)
+        })
+        await woO.save([{ id: 'o1', name: 'ok' }, { id: 'o2', $bad: 1 }])
+        vget[13] = seq
+
+        //訂閱函數拋錯不得影響本次操作之結果
+        let woT = WOrm(genOpt('everrthrow'))
+        await woT.delAll()
+        woT.on('error', function() {
+            throw new Error('訂閱者拋錯')
+        })
+        await woT.insert({ id: 't1' })
+        vget[14] = await woT.del([{ id: 't1' }, { name: 'no-id' }])
+
+    })
+
+    vans[1] = 1
+    it(`should get ${JSON.stringify(vans[1])} for count of error event in batch error`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = 'insert'
+    it(`should get ${JSON.stringify(vans[2])} for mode of error event in batch error`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = 'string'
+    it(`should get ${JSON.stringify(vans[3])} for type of err in error event`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+    vans[4] = true
+    it(`should get ${JSON.stringify(vans[4])} for same err between error event and reject`, async function() {
+        assert.strict.deepStrictEqual(vget[4], vans[4])
+    })
+
+    vans[5] = ['save']
+    it(`should get ${JSON.stringify(vans[5])} for mode of error event in save batch error`, async function() {
+        assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+    vans[6] = 1
+    it(`should get ${JSON.stringify(vans[6])} for count of error event in save single failure`, async function() {
+        assert.strict.deepStrictEqual(vget[6], vans[6])
+    })
+
+    vans[7] = 'save'
+    it(`should get ${JSON.stringify(vans[7])} for mode of error event in save single failure`, async function() {
+        assert.strict.deepStrictEqual(vget[7], vans[7])
+    })
+
+    vans[8] = true
+    it(`should get ${JSON.stringify(vans[8])} for same err between error event and result of save`, async function() {
+        assert.strict.deepStrictEqual(vget[8], vans[8])
+    })
+
+    vans[9] = 1
+    it(`should get ${JSON.stringify(vans[9])} for count of error event in del single failure`, async function() {
+        assert.strict.deepStrictEqual(vget[9], vans[9])
+    })
+
+    vans[10] = 'del'
+    it(`should get ${JSON.stringify(vans[10])} for mode of error event in del single failure`, async function() {
+        assert.strict.deepStrictEqual(vget[10], vans[10])
+    })
+
+    vans[11] = true
+    it(`should get ${JSON.stringify(vans[11])} for same err between error event and result of del`, async function() {
+        assert.strict.deepStrictEqual(vget[11], vans[11])
+    })
+
+    vans[12] = 0
+    it(`should get ${JSON.stringify(vans[12])} for count of error event in normal results`, async function() {
+        assert.strict.deepStrictEqual(vget[12], vans[12])
+    })
+
+    vans[13] = ['error:save', 'change:save']
+    it(`should get ${JSON.stringify(vans[13])} for order of error and change`, async function() {
+        assert.strict.deepStrictEqual(vget[13], vans[13])
+    })
+
+    vans[14] = [
+        { n: 1, nDeleted: 1, ok: 1 },
+        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }
+    ]
+    it(`should get ${JSON.stringify(vans[14])} for result with throwing error listener`, async function() {
+        assert.strict.deepStrictEqual(vget[14], vans[14])
+    })
+
+})
+
+
+describe('error listener does not change behavior', function() {
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(120000)
+
+        //run, 以同一組操作跑兩次, 差別僅在有無註冊error監聽
+        //T10.1第2條: 操作行為不得因監聽者之有無而改變
+        let run = async (cl, withListener) => {
+            let wo = WOrm(genOpt(cl))
+            if (withListener) {
+                wo.on('error', function() {})
+            }
+            await wo.delAll()
+
+            let out = []
+
+            //整批性錯誤
+            let woOff = WOrm(genOptPk(`${cl}off`, false))
+            if (withListener) {
+                woOff.on('error', function() {})
+            }
+            await woOff.delAll()
+            await woOff.insert({ name: 'no-id' })
+                .then((r) => out.push({ t: 'resolve', r }))
+                .catch((e) => out.push({ t: 'reject', e: e.toString() }))
+
+            //逐筆失敗
+            await wo.insert([{ id: 'a1' }, { id: 'a2' }])
+            let rs = await wo.save([{ id: 'a1', name: 'ok' }, { id: 'a2', $bad: 1 }])
+            out.push({ t: 'save', ok: rs.map((v) => v.ok), n: rs.map((v) => v.n) })
+
+            //del逐筆失敗
+            let rd = await wo.del([{ id: 'a1' }, { name: 'no-id' }])
+            out.push({ t: 'del', r: rd })
+
+            //讀取函數之整批性錯誤
+            await wo.selectByPk('not-existed')
+                .then((r) => out.push({ t: 'selectByPk', r }))
+                .catch((e) => out.push({ t: 'selectByPkReject', e: e.toString() }))
+
+            return out
+        }
+
+        let a = await run('evnolisten', false)
+        let b = await run('evlisten', true)
+
+        vget[1] = JSON.stringify(a) === JSON.stringify(b)
+        vget[2] = a[0].t
+        vget[3] = a[1].ok
+
+    })
+
+    vans[1] = true
+    it(`should get ${JSON.stringify(vans[1])} for same result with and without error listener`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = 'reject'
+    it(`should get ${JSON.stringify(vans[2])} for reject without error listener`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = [1, 0]
+    it(`should get ${JSON.stringify(vans[3])} for ok of save without error listener`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+})
+
+
 describe('change event', function() {
     let vans = {}
     let vget = {}

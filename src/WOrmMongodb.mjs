@@ -1,4 +1,3 @@
-import events from 'events'
 import mongodb from 'mongodb'
 import stream from 'stream'
 import cloneDeep from 'lodash-es/cloneDeep.js'
@@ -7,6 +6,7 @@ import get from 'lodash-es/get.js'
 import map from 'lodash-es/map.js'
 import omit from 'lodash-es/omit.js'
 import size from 'lodash-es/size.js'
+import evem from 'wsemi/src/evem.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
 import genID from 'wsemi/src/genID.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
@@ -63,8 +63,9 @@ function WOrmMongodb(opt = {}) {
     let _indexGfsReady = false
 
 
-    //ee
-    let ee = new events.EventEmitter()
+    //ee, 採wsemi之evem(即eventemitter3), 其於'error'無監聽者時僅回傳false而不拋出,
+    //故本套件之操作行為不因呼叫端有無註冊監聽而改變; Node內建之EventEmitter具該拋出語義, 不可用
+    let ee = evem()
 
 
     //MongoClient
@@ -78,7 +79,7 @@ function WOrmMongodb(opt = {}) {
      * @param {Error|String} err 輸入錯誤物件或字串
      * @returns {String} 回傳錯誤訊息字串
      */
-    function genErrMsg(err) {
+    function getErrMsg(err) {
 
         //message
         let message = get(err, 'message')
@@ -105,6 +106,28 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             console.log(err)
+        }
+    }
+
+
+    /**
+     * 發出error事件，操作發生錯誤時發出，錯誤訊息一律轉為字串
+     * 註: 事件僅為附加通知，所送出之資訊必另有正規管道——整批性錯誤經Promise.reject，逐筆失敗經該筆之err欄位
+     * 註: 訂閱函數拋錯不得影響本次操作之結果，故另包try並自行吞掉
+     * 註: 正常結果不得發出本事件，如insert全數已存在、save合併後內容相同、del主鍵未命中、selectByPk查無數據
+     *
+     * @ignore
+     * @param {String} mode 輸入操作別字串
+     * @param {Array|null} data 輸入本次操作之數據
+     * @param {Error|String} err 輸入錯誤物件或字串
+     * @returns {undefined} 無回傳值
+     */
+    function emitError(mode, data, err) {
+        try {
+            ee.emit('error', mode, data, getErrMsg(err))
+        }
+        catch (errEmit) {
+            console.log(errEmit)
         }
     }
 
@@ -310,7 +333,12 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('select', null, res)
+
             return Promise.reject(res)
         }
         return res
@@ -368,7 +396,12 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('selectByPk', null, res)
+
             return Promise.reject(res)
         }
         return res
@@ -469,7 +502,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('insert', data, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('insert', data, res)
+
             return Promise.reject(res)
         }
         return res
@@ -574,7 +612,7 @@ function WOrmMongodb(opt = {}) {
                     nInserted: 0,
                     nModified: 0,
                     ok: 0,
-                    err: genErrMsg(err),
+                    err: getErrMsg(err),
                 }
 
                 break
@@ -585,6 +623,11 @@ function WOrmMongodb(opt = {}) {
         //emit, 須於結果定案後發出, 避免訂閱函數拋錯影響本筆結果
         if (inserted) {
             emitChange('insert', [v], rest)
+        }
+
+        //emit, 逐筆失敗須於該筆結果定案後發出, 每筆一次
+        if (rest.ok === 0) {
+            emitError('save', [v], rest.err)
         }
 
         return rest
@@ -662,7 +705,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('save', data, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('save', data, res)
+
             return Promise.reject(res)
         }
         return res
@@ -714,47 +762,58 @@ function WOrmMongodb(opt = {}) {
                 //id, del不補值, 未帶有效id者視為本筆無法處理
                 let id = get(v, 'id')
 
+                //rest
+                let rest = null
+
                 //check, 不得將無效id送進查詢條件, 因undefined經序列化為null會誤中id為null之數據
                 if (!isestr(id)) {
-                    return {
+
+                    //rest
+                    rest = {
                         n: 0,
                         nDeleted: 0,
                         ok: 0,
                         err: `invalid id[${id}]`,
                     }
+
                 }
+                else {
 
-                //rest
-                let rest = null
+                    try {
 
-                try {
+                        //deleteOne
+                        let r = await collection.deleteOne({ id })
 
-                    //deleteOne
-                    let r = await collection.deleteOne({ id })
+                        //nDeleted
+                        let nDeleted = get(r, 'deletedCount', 0)
 
-                    //nDeleted
-                    let nDeleted = get(r, 'deletedCount', 0)
+                        //rest, 未命中時nDeleted為0, 屬正常結果
+                        rest = {
+                            n: nDeleted,
+                            nDeleted,
+                            ok: 1,
+                        }
 
-                    //rest, 未命中時nDeleted為0, 屬正常結果
-                    rest = {
-                        n: nDeleted,
-                        nDeleted,
-                        ok: 1,
+                    }
+                    catch (err) {
+
+                        //本筆失敗不中斷整批
+
+                        //rest
+                        rest = {
+                            n: 1,
+                            nDeleted: 0,
+                            ok: 0,
+                            err: getErrMsg(err),
+                        }
+
                     }
 
                 }
-                catch (err) {
 
-                    //本筆失敗不中斷整批
-
-                    //rest
-                    rest = {
-                        n: 1,
-                        nDeleted: 0,
-                        ok: 0,
-                        err: genErrMsg(err),
-                    }
-
+                //emit, 逐筆失敗須於該筆結果定案後發出, 每筆一次
+                if (rest.ok === 0) {
+                    emitError('del', [v], rest.err)
                 }
 
                 return rest
@@ -775,7 +834,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('del', data, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('del', data, res)
+
             return Promise.reject(res)
         }
         return res
@@ -832,7 +896,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('delAll', null, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('delAll', null, res)
+
             return Promise.reject(res)
         }
         return res
@@ -937,7 +1006,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('insertGfs', data, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('insertGfs', data, res)
+
             return Promise.reject(res)
         }
         return res
@@ -1042,13 +1116,19 @@ function WOrmMongodb(opt = {}) {
             client = null
         }
 
+        //check, 查無檔案已於catch內判定為正常結果而未設isErr, 故不會誤發error事件
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('selectByPkGfs', null, res)
+
             return Promise.reject(res)
         }
         return res
     }
 
 
+    //_findGfs, 內部查找函數, 其reject由delGfs與delAllGfs之catch接住並於該處發出error事件, 故本函數不自行發出
     async function _findGfs(find = {}, bucket) {
         let isErr = false
 
@@ -1122,52 +1202,63 @@ function WOrmMongodb(opt = {}) {
                 //id, delGfs不補值, 未帶有效id者視為本筆無法處理
                 let id = get(v, 'id')
 
+                //rest
+                let rest = null
+
                 //check, 判定基準與del一致
                 if (!isestr(id)) {
-                    return {
+
+                    //rest
+                    rest = {
                         n: 0,
                         nDeleted: 0,
                         ok: 0,
                         err: `invalid id[${id}]`,
                     }
-                }
-
-                //rest
-                let rest = null
-
-                try {
-
-                    //_findGfs
-                    let ltdt = await _findGfs({ filename: id }, bucket)
-
-                    //delete, 建立唯一索引後同一id至多一筆,
-                    //既有數據若尚存重複id則一併刪除並如實回報nDeleted
-                    let nDeleted = 0
-                    for (let vv of ltdt) {
-                        await bucket.delete(vv._id)
-                        nDeleted++
-                    }
-
-                    //rest, n為命中與否, 未命中時兩者皆為0且屬正常結果
-                    rest = {
-                        n: nDeleted > 0 ? 1 : 0,
-                        nDeleted,
-                        ok: 1,
-                    }
 
                 }
-                catch (err) {
+                else {
 
-                    //本筆失敗不中斷整批
+                    try {
 
-                    //rest
-                    rest = {
-                        n: 1,
-                        nDeleted: 0,
-                        ok: 0,
-                        err: genErrMsg(err),
+                        //_findGfs
+                        let ltdt = await _findGfs({ filename: id }, bucket)
+
+                        //delete, 建立唯一索引後同一id至多一筆,
+                        //既有數據若尚存重複id則一併刪除並如實回報nDeleted
+                        let nDeleted = 0
+                        for (let vv of ltdt) {
+                            await bucket.delete(vv._id)
+                            nDeleted++
+                        }
+
+                        //rest, n為命中與否, 未命中時兩者皆為0且屬正常結果
+                        rest = {
+                            n: nDeleted > 0 ? 1 : 0,
+                            nDeleted,
+                            ok: 1,
+                        }
+
+                    }
+                    catch (err) {
+
+                        //本筆失敗不中斷整批
+
+                        //rest
+                        rest = {
+                            n: 1,
+                            nDeleted: 0,
+                            ok: 0,
+                            err: getErrMsg(err),
+                        }
+
                     }
 
+                }
+
+                //emit, 逐筆失敗須於該筆結果定案後發出, 每筆一次
+                if (rest.ok === 0) {
+                    emitError('delGfs', [v], rest.err)
                 }
 
                 return rest
@@ -1188,7 +1279,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('delGfs', data, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('delGfs', data, res)
+
             return Promise.reject(res)
         }
         return res
@@ -1268,7 +1364,12 @@ function WOrmMongodb(opt = {}) {
             emitChange('delAllGfs', null, res)
         }
 
+        //check
         if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('delAllGfs', null, res)
+
             return Promise.reject(res)
         }
         return res

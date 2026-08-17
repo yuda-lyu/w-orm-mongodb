@@ -236,6 +236,43 @@ delAll(find)        → { n, nDeleted, ok }
 
 `del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
 
+## Events
+
+操作物件為`EventEmitter`，發出`change`與`error`兩種事件，供於單一處集中觀察資料異動與失敗，不必在每個呼叫點各自包裝。
+
+```alias
+change  (mode, data, res)   資料實際異動成功後，整批一次
+error   (mode, data, err)   整批性錯誤於 reject 前；逐筆失敗於該筆定案後，每筆一次
+
+mode    函數名稱，如 'insert'、'save'、'del'、'delAll'、'select'、'selectByPk'、'insertGfs' 等
+data    輸入數據，無輸入數據者（如 delAll、select、selectByPk）為 null
+err     錯誤訊息字串
+```
+
+```alias
+let wo = WOrm(opt)
+
+wo.on('change', function(mode, data, res) {
+    console.log('change', mode, res)
+})
+
+wo.on('error', function(mode, data, err) {
+    console.log('error', mode, err)
+})
+```
+
+**事件僅為附加通知，不承擔任何回傳義務。** 凡經由事件送出之資訊，必同時經由正規管道送達——整批性錯誤經`Promise.reject`，逐筆失敗經該筆之`err`欄位，操作結果經 resolve 值。把全部事件移除之後，呼叫端仍能取得完整資訊。
+
+**操作行為不因監聽者之有無而改變。** 同一份程式碼、同一組輸入，於有註冊監聽與未註冊監聽兩種情況下，回傳值與 resolve／reject 之選擇完全相同。本套件之`EventEmitter`採`eventemitter3`（`wsemi`之`evem()`），其於`'error'`無監聽者時僅回傳`false`而不拋出；Node 內建之`events.EventEmitter`具「`'error'`無監聽者時將錯誤拋出」之語義，故不採用。
+
+訂閱函數自身拋錯亦不影響本次操作之結果——每一處`emit`皆以 try/catch 包覆。
+
+**正常結果不發出`error`。** `insert`全數已存在、`save`合併後內容相同而未寫入、`del`主鍵未命中、`delAll`條件無命中、`selectByPk`查無數據，皆為正常結果而非錯誤。
+
+**收到`error`不表示該次呼叫失敗。** 逐筆失敗時整批仍 resolve，欲判斷整批成敗仍依上方「判讀準則」。
+
+`save`於逐筆插入時另發出`mode`為`'insert'`之`change`事件，供區辨新增與更新。讀取函數（`select`、`selectByPk`、`selectByPkGfs`）不發出`change`。
+
 ## Primary key
 
 本套件之主鍵欄位固定為`id`，尚未支援由呼叫端指定。`id`為無業務語義之識別碼。
