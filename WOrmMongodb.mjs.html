@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WOrmMongodb.html">WOrmMongodb</a><ul class='methods'><li data-type='method'><a href="WOrmMongodb.html#.del">del</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAll">delAll</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAllGfs">delAllGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.delGfs">delGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.insert">insert</a></li><li data-type='method'><a href="WOrmMongodb.html#.insertGfs">insertGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.save">save</a></li><li data-type='method'><a href="WOrmMongodb.html#.select">select</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectByPk">selectByPk</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectByPkGfs">selectByPkGfs</a></li></ul></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WOrmMongodb.html">WOrmMongodb</a><ul class='methods'><li data-type='method'><a href="WOrmMongodb.html#.del">del</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAll">delAll</a></li><li data-type='method'><a href="WOrmMongodb.html#.delAllGfs">delAllGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.delGfs">delGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.insert">insert</a></li><li data-type='method'><a href="WOrmMongodb.html#.insertBulk">insertBulk</a></li><li data-type='method'><a href="WOrmMongodb.html#.insertGfs">insertGfs</a></li><li data-type='method'><a href="WOrmMongodb.html#.save">save</a></li><li data-type='method'><a href="WOrmMongodb.html#.select">select</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectByPk">selectByPk</a></li><li data-type='method'><a href="WOrmMongodb.html#.selectByPkGfs">selectByPkGfs</a></li></ul></li></ul>
     
 </nav>
 
@@ -49,6 +49,7 @@
 import stream from 'stream'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import every from 'lodash-es/every.js'
+import filter from 'lodash-es/filter.js'
 import get from 'lodash-es/get.js'
 import map from 'lodash-es/map.js'
 import omit from 'lodash-es/omit.js'
@@ -108,6 +109,10 @@ function WOrmMongodb(opt = {}) {
 
     //_indexGfsReady, GridFS之唯一索引亦只須建立一次
     let _indexGfsReady = false
+
+
+    //_canUseTx, 拓樸判定只須一次, 以旗標記錄避免每次操作皆多一次round-trip
+    let _canUseTx = null
 
 
     //ee, 採wsemi之evem(即eventemitter3), 其於'error'無監聽者時僅回傳false而不拋出,
@@ -554,6 +559,208 @@ function WOrmMongodb(opt = {}) {
 
             //emit, 整批性錯誤須於reject之前發出
             emitError('insert', data, res)
+
+            return Promise.reject(res)
+        }
+        return res
+    }
+
+
+    /**
+     * 判定本次部署是否支援交易
+     * 註: MongoDB之交易須replica set或分片叢集，standalone不支援
+     * 判定依據為hello回應：replica set帶setName，連至mongos者msg為isdbgrid，standalone兩者皆無
+     *
+     * @ignore
+     * @param {Object} client 輸入MongoClient物件
+     * @returns {Promise} 回傳Promise，resolve回傳是否支援交易布林值，reject回傳錯誤訊息
+     */
+    async function canUseTx(client) {
+
+        //check
+        if (isbol(_canUseTx)) {
+            return _canUseTx
+        }
+
+        //hello
+        let hello = await client.db(opt.db).admin().command({ hello: 1 })
+
+        //_canUseTx
+        _canUseTx = isestr(get(hello, 'setName')) || get(hello, 'msg') === 'isdbgrid'
+
+        return _canUseTx
+    }
+
+
+    /**
+     * 以交易達成insertBulk之全有全無
+     * 交易內任一筆失敗即整批回滾，故不會寫入任何一筆，無須補償動作
+     *
+     * @ignore
+     * @param {Object} client 輸入MongoClient物件
+     * @param {Object} collection 輸入資料表物件
+     * @param {Array} data 輸入數據陣列
+     * @returns {Promise} 回傳Promise，resolve回傳undefined，reject回傳錯誤訊息
+     */
+    async function _insertBulkByTx(client, collection, data) {
+
+        //session
+        let session = client.startSession()
+
+        try {
+
+            //withTransaction, ordered:true令首筆衝突即停止, 由交易回滾保證未寫入任何一筆
+            await session.withTransaction(async () => {
+                await collection.insertMany(data, { session, ordered: true })
+            })
+
+        }
+        finally {
+            await session.endSession()
+        }
+
+    }
+
+
+    /**
+     * 以補償動作達成insertBulk之全有全無，供無交易可用之standalone使用
+     * 註: 補償係刪除本次呼叫已寫入者，其_id由驅動於送出前在用戶端產生，
+     * 與呼叫前既有數據之_id必不相同，故縱使該筆之id已存在亦不會誤刪既有數據；
+     * 刪除未寫入者為無操作，故不須精確得知哪幾筆已寫入
+     * 註: 行程若於補償途中中止(斷電、強制終止)，已寫入之部份可能殘留，此為無交易可用之固有限制
+     *
+     * @ignore
+     * @param {Object} collection 輸入資料表物件
+     * @param {Array} data 輸入數據陣列
+     * @returns {Promise} 回傳Promise，resolve回傳undefined，reject回傳錯誤訊息
+     */
+    async function _insertBulkByCompensate(collection, data) {
+
+        //errIns
+        let errIns = null
+
+        try {
+            await collection.insertMany(data, { ordered: false })
+        }
+        catch (err) {
+            errIns = err
+        }
+
+        //check, 全數插入成功即無須補償
+        if (errIns === null) {
+            return
+        }
+
+        //idDels, 取本次由驅動所產生之全部_id
+        let idDels = map(data, function(v) {
+            return v._id
+        })
+        idDels = filter(idDels, function(v) {
+            return v !== undefined &amp;&amp; v !== null
+        })
+
+        //補償, 刪除本次已寫入者
+        if (size(idDels) > 0) {
+            await collection.deleteMany({ _id: { $in: idDels } })
+        }
+
+        throw errIns
+    }
+
+
+    /**
+     * 批次插入數據，全批視為一個單位：全部插入成功，或一筆都不寫入
+     * 任一筆之id已存在(含同批含重複id)即以reject拋出整批性錯誤，且不寫入任何一筆
+     * 註: 本函數非insert之加速版，兩者衝突政策不同——insert跳過已存在者而整批ok為1，
+     * 本函數則整批reject；需要逐筆處置者改用insert
+     * 註: n為輸入筆數，nInserted於成功時恆等於n；不提供逐筆結果，故不出現ok為0與err
+     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: 全有全無之達成方式依部署而異——具replica set或分片叢集者以交易包覆，
+     * standalone無交易可用而以補償動作達成，其限制詳見_insertBulkByCompensate
+     *
+     * @memberOf WOrmMongodb
+     * @param {Object|Array} data 輸入數據物件或陣列
+     * @returns {Promise} 回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息
+     */
+    async function insertBulk(data) {
+        let isErr = false
+
+        //check
+        if (!iseobj(data) &amp;&amp; !isearr(data)) {
+            return {
+                n: 0,
+                nInserted: 0,
+                ok: 1,
+            }
+        }
+
+        //cloneDeep
+        data = cloneDeep(data)
+
+        //client
+        let client = new MongoClient(opt.url)
+
+        //res
+        let res = null
+        try {
+
+            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
+            await client.connect()
+
+            //database, collection
+            let database = client.db(opt.db)
+            let collection = database.collection(opt.cl)
+
+            //check
+            if (!isarr(data)) {
+                data = [data]
+            }
+
+            //check id, 須於任何寫入之前一次完成
+            data = map(data, procPk)
+
+            //ensureIndex
+            await ensureIndex(collection)
+
+            //nAll, n之基準為輸入筆數
+            let nAll = size(data)
+
+            //check, 有交易可用者一律優先採用交易, 其回滾即為全有全無之保證
+            let bTx = await canUseTx(client)
+            if (bTx) {
+                await _insertBulkByTx(client, collection, data)
+            }
+            else {
+                await _insertBulkByCompensate(collection, data)
+            }
+
+            //res, 執行至此表全數插入成功, 故nInserted恆等於n
+            res = {
+                n: nAll,
+                nInserted: nAll,
+                ok: 1,
+            }
+
+        }
+        catch (err) {
+            isErr = true
+            res = err
+        }
+        finally {
+            await client.close()
+            client = null
+        }
+
+        //emit
+        if (!isErr) {
+            emitChange('insertBulk', data, res)
+        }
+
+        //check
+        if (isErr) {
+
+            //emit, 整批性錯誤須於reject之前發出
+            emitError('insertBulk', data, res)
 
             return Promise.reject(res)
         }
@@ -1427,6 +1634,7 @@ function WOrmMongodb(opt = {}) {
     ee.select = select
     ee.selectByPk = selectByPk
     ee.insert = insert
+    ee.insertBulk = insertBulk
     ee.save = save
     ee.del = del
     ee.delAll = delAll
@@ -1455,7 +1663,7 @@ export default WOrmMongodb
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Aug 17 2026 09:16:25 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Aug 17 2026 11:28:35 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
