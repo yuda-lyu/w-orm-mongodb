@@ -68,9 +68,15 @@ async function test() {
     //wo
     let wo = WOrm(opt)
 
-    //on
+    //on change, 資料實際異動成功後發出
     wo.on('change', function(mode, data, res) {
         console.log('change', mode)
+    })
+
+    //on error, 操作發生錯誤時發出, 整批性錯誤於reject前、逐筆失敗於該筆定案後
+    //註: 事件僅為附加通知, 錯誤仍可由reject或逐筆之err欄位取得; 正常結果不會發出
+    wo.on('error', function(mode, data, err) {
+        console.log('error', mode, err)
     })
 
     //delAll
@@ -195,13 +201,14 @@ test()
 
 ## Return values
 
-本套件屬`w-orm-*`系列，六個函數`select`、`selectByPk`、`insert`、`save`、`del`、`delAll`之回傳結構依系列統一規格：
+本套件屬`w-orm-*`系列，七個函數`select`、`selectByPk`、`insert`、`insertBulk`、`save`、`del`、`delAll`之回傳結構依系列統一規格：
 
 ```alias
 select(find)        → [ {...}, {...} ]                    無符合為 []
 selectByPk(pk)      → {...} | null
 
 insert(data)        → { n, nInserted, ok }
+insertBulk(data)    → { n, nInserted, ok }          衝突即整批reject且不寫入任何一筆
 save(data, option)  → [ { n, nInserted, nModified, ok }, ... ]
 del(data)           → [ { n, nDeleted, ok }, ... ]
 delAll(find)        → { n, nDeleted, ok }
@@ -225,6 +232,7 @@ delAll(find)        → { n, nDeleted, ok }
 
 | 要判斷什麼 | 看什麼 |
 |---|---|
+| 這批有沒有撞到既有主鍵 | `insertBulk`是否`reject` |
 | 這批有幾筆是新資料 | `insert`之`nInserted` |
 | 這筆是不是新資料 | `save`之`nInserted === 1` |
 | 這筆內容有沒有實際寫入 | `save`之`nModified === 1` |
@@ -235,6 +243,34 @@ delAll(find)        → { n, nDeleted, ok }
 `save`之「內容相同」判定基準為**將待儲存物件合併進現值之後，結果與現值相同**，由MongoDB於伺服器端逐欄位比對。故僅給部份欄位且該些欄位值皆與現值相同時，`nModified`亦為`0`。
 
 `del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
+
+## insert vs insertBulk
+
+兩者**衝突政策不同，不是同一個操作的加速版**：
+
+| 情形 | `insert` | `insertBulk` |
+|---|---|---|
+| 主鍵已存在 | 跳過該筆，整批`ok: 1` | **整批`reject`，且不寫入任何一筆** |
+| 同批重複主鍵 | 僅首筆計入`nInserted` | 視為衝突，整批`reject` |
+| `nInserted` | 實際插入筆數，`0 ≤ nInserted ≤ n` | 成功時恆等於`n` |
+| 適用場景 | 一般寫入，資料表可能已有既有資料 | 批次匯入，本即預期無衝突 |
+
+確無衝突時兩者的可觀察結果完全相同（皆回`{ n, nInserted: n, ok: 1 }`），差異只在有衝突時顯現。需要逐筆處置者用`insert`；`insertBulk`不提供逐筆結果，故不出現`ok: 0`與`err`。
+
+**本套件的`insertBulk`不會比`insert`快**——`insert`本來就是一次往返且計數精確。提供它是為了語義（全有全無）與跨套件的可替換性。
+
+### 全有全無的達成方式
+
+依部署而異，由套件於執行期以`hello`回應自動判定（`setName`或`msg`為`isdbgrid`），每個實例判定一次：
+
+| 部署 | 作法 |
+|---|---|
+| replica set / 分片叢集 | 以交易包覆`insertMany`，失敗即回滾 |
+| standalone | **無交易可用**，改以補償動作：偵測到衝突後刪除本次已寫入者，再`reject` |
+
+補償動作刪除的依據是**本次由驅動在用戶端產生的`_id`**，與呼叫前既有資料的`_id`必不相同，故縱使該筆的`id`已存在也不會誤刪既有資料。
+
+> **standalone 的限制**：補償動作於正常運作下可使狀態回復如初，但**行程若於補償途中中止（斷電、強制終止），已寫入的部分可能殘留**。這是無交易可用的固有限制。需要嚴格保證者請部署 replica set（單成員即可啟用交易）。
 
 ## Events
 
@@ -434,9 +470,15 @@ async function test() {
     //wo
     let wo = WOrm(opt)
 
-    //on
+    //on change, 資料實際異動成功後發出
     wo.on('change', function(mode, data, res) {
         console.log('change', mode)
+    })
+
+    //on error, 操作發生錯誤時發出, 整批性錯誤於reject前、逐筆失敗於該筆定案後
+    //註: 事件僅為附加通知, 錯誤仍可由reject或逐筆之err欄位取得; 正常結果不會發出
+    wo.on('error', function(mode, data, err) {
+        console.log('error', mode, err)
     })
 
     //u8a, 亦可為瀏覽器或nodejs取得之任何Uint8Array

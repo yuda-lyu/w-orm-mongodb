@@ -46,9 +46,15 @@ async function test() {
     //wo
     let wo = WOrm(opt)
 
-    //on
+    //on change, 資料實際異動成功後發出
     wo.on('change', function(mode, data, res) {
         console.log('change', mode)
+    })
+
+    //on error, 操作發生錯誤時發出, 整批性錯誤於reject前、逐筆失敗於該筆定案後
+    //註: 事件僅為附加通知, 錯誤仍可由reject或逐筆之err欄位取得; 正常結果不會發出
+    wo.on('error', function(mode, data, err) {
+        console.log('error', mode, err)
     })
 
     //delAll

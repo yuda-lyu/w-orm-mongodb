@@ -599,6 +599,206 @@ describe('insert', function() {
 })
 
 
+//insertBulk之語義與insert不同: insert跳過已存在者而整批ok為1, insertBulk則整批reject且不寫入任何一筆
+//本檔之容器為standalone, 無交易可用, 故走補償動作路徑; 交易路徑另見api-insertbulk-rs.test.mjs
+
+
+describe('insertBulk', function() {
+    let rt = null
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(120000)
+
+        let cl = 'bulkcnt'
+        let wo = WOrm(genOpt(cl))
+        await wo.delAll()
+
+        //全新3筆, nInserted須等於n
+        vget[1] = await wo.insertBulk([
+            { id: 'b1', name: 'peter' },
+            { id: 'b2', name: 'rosemary' },
+            { id: 'b3', name: 'kettle' },
+        ])
+        vget[2] = (await wo.select()).length
+
+        //撞既有主鍵須整批reject
+        rt = null
+        let nBefore = (await wo.select()).length
+        await wo.insertBulk([
+            { id: 'b4', name: 'new1' },
+            { id: 'b2', name: 'dup' },
+            { id: 'b5', name: 'new2' },
+        ])
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[3] = rt.indexOf('E11000') >= 0 || rt.indexOf('duplicate key') >= 0
+
+        //失敗後資料表不得有任何新增
+        vget[4] = (await wo.select()).length - nBefore
+        vget[5] = [
+            await wo.selectByPk('b4'),
+            await wo.selectByPk('b5'),
+        ]
+
+        //撞既有主鍵者本身不得被改動
+        vget[6] = (await wo.selectByPk('b2')).name
+
+        //同批含重複主鍵須整批reject
+        rt = null
+        nBefore = (await wo.select()).length
+        await wo.insertBulk([
+            { id: 'b6', name: 'a' },
+            { id: 'b6', name: 'b' },
+            { id: 'b7', name: 'c' },
+        ])
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[7] = rt.indexOf('E11000') >= 0 || rt.indexOf('duplicate key') >= 0
+        vget[8] = (await wo.select()).length - nBefore
+        vget[9] = [
+            await wo.selectByPk('b6'),
+            await wo.selectByPk('b7'),
+        ]
+
+        //單一物件輸入亦須可用
+        vget[10] = await wo.insertBulk({ id: 'b8', name: 'single' })
+
+        //輸入無效視為空結果
+        vget[11] = await wo.insertBulk(null)
+
+        //鍵集合須與insert完全相同
+        let ri = await wo.insert({ id: 'b9', name: 'x' })
+        vget[12] = [genKeys(vget[1]), genKeys(vget[10]), genKeys(vget[11]), genKeys(ri)]
+
+        //autoGenPk預設為true, 未帶id者自動產生
+        vget[13] = await wo.insertBulk([{ name: 'nopk1' }, { name: 'nopk2' }])
+
+        //autoGenPk為false且未帶id者須reject, 且同批之有效筆數不得被寫入
+        let woOff = WOrm(genOptPk('bulkpkoff', false))
+        await woOff.delAll()
+        rt = null
+        await woOff.insertBulk([
+            { id: 'p-ok1', name: 'ok1' },
+            { name: 'no-id' },
+        ])
+            .then(function(msg) {
+                rt = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rt = msg.toString()
+            })
+        vget[14] = rt
+        vget[15] = await woOff.selectByPk('p-ok1')
+
+        //事件, 成功時發change, 失敗時發error且mode為insertBulk
+        let woEv = WOrm(genOpt('bulkevent'))
+        await woEv.delAll()
+        let evs = []
+        woEv.on('change', function(mode) {
+            evs.push(`change:${mode}`)
+        })
+        woEv.on('error', function(mode) {
+            evs.push(`error:${mode}`)
+        })
+        await woEv.insertBulk({ id: 'e1', name: 'a' })
+        await woEv.insertBulk({ id: 'e1', name: 'b' }).catch(() => {})
+        vget[16] = evs
+
+    })
+
+    vans[1] = { n: 3, nInserted: 3, ok: 1 }
+    it(`should get ${JSON.stringify(vans[1])} for insertBulk 3 new records`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = 3
+    it(`should get ${JSON.stringify(vans[2])} for records after insertBulk`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = true
+    it(`should get ${JSON.stringify(vans[3])} for reject of insertBulk with existed id`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+    vans[4] = 0
+    it(`should get ${JSON.stringify(vans[4])} for no record added after rejected insertBulk`, async function() {
+        assert.strict.deepStrictEqual(vget[4], vans[4])
+    })
+
+    vans[5] = [null, null]
+    it(`should get ${JSON.stringify(vans[5])} for not writing any record in rejected insertBulk`, async function() {
+        assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+    vans[6] = 'rosemary'
+    it(`should get ${JSON.stringify(vans[6])} for not modifying existed record by rejected insertBulk`, async function() {
+        assert.strict.deepStrictEqual(vget[6], vans[6])
+    })
+
+    vans[7] = true
+    it(`should get ${JSON.stringify(vans[7])} for reject of insertBulk with duplicated id in same batch`, async function() {
+        assert.strict.deepStrictEqual(vget[7], vans[7])
+    })
+
+    vans[8] = 0
+    it(`should get ${JSON.stringify(vans[8])} for no record added after insertBulk with duplicated id`, async function() {
+        assert.strict.deepStrictEqual(vget[8], vans[8])
+    })
+
+    vans[9] = [null, null]
+    it(`should get ${JSON.stringify(vans[9])} for not writing any record by duplicated id in same batch`, async function() {
+        assert.strict.deepStrictEqual(vget[9], vans[9])
+    })
+
+    vans[10] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[10])} for insertBulk with single object`, async function() {
+        assert.strict.deepStrictEqual(vget[10], vans[10])
+    })
+
+    vans[11] = { n: 0, nInserted: 0, ok: 1 }
+    it(`should get ${JSON.stringify(vans[11])} for insertBulk with invalid data`, async function() {
+        assert.strict.deepStrictEqual(vget[11], vans[11])
+    })
+
+    vans[12] = ['n,nInserted,ok', 'n,nInserted,ok', 'n,nInserted,ok', 'n,nInserted,ok']
+    it(`should get ${JSON.stringify(vans[12])} for same key set between insertBulk and insert`, async function() {
+        assert.strict.deepStrictEqual(vget[12], vans[12])
+    })
+
+    vans[13] = { n: 2, nInserted: 2, ok: 1 }
+    it(`should get ${JSON.stringify(vans[13])} for insertBulk without id by default autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[13], vans[13])
+    })
+
+    vans[14] = 'Error: invalid data[1].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[14])} for insertBulk without id by autoGenPk=false`, async function() {
+        assert.strict.deepStrictEqual(vget[14], vans[14])
+    })
+
+    vans[15] = null
+    it(`should get ${JSON.stringify(vans[15])} for not writing valid records in rejected insertBulk by autoGenPk`, async function() {
+        assert.strict.deepStrictEqual(vget[15], vans[15])
+    })
+
+    vans[16] = ['change:insertBulk', 'error:insertBulk']
+    it(`should get ${JSON.stringify(vans[16])} for events of insertBulk`, async function() {
+        assert.strict.deepStrictEqual(vget[16], vans[16])
+    })
+
+})
+
+
 describe('save', function() {
     let vans = {}
     let vget = {}
