@@ -83,7 +83,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line37">line 37</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line39">line 39</a>
     </li></ul></dd>
     
 
@@ -474,7 +474,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line936">line 936</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line980">line 980</a>
     </li></ul></dd>
     
 
@@ -636,7 +636,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1064">line 1064</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1108">line 1108</a>
     </li></ul></dd>
     
 
@@ -816,7 +816,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1518">line 1518</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1562">line 1562</a>
     </li></ul></dd>
     
 
@@ -996,7 +996,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1374">line 1374</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1418">line 1418</a>
     </li></ul></dd>
     
 
@@ -1141,7 +1141,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
 
     
 
-    <h4 class="name" id=".insert"><span class="type-signature type-signature-async, static">(async, static) </span>insert<span class="signature">(data)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".insert"><span class="type-signature type-signature-async, static">(async, static) </span>insert<span class="signature">(data, option<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -1153,14 +1153,16 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
 由MongoDB於唯一索引上原子完成[檢查id未存在]與[寫入]，併發時同一id僅有一次成功
-註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+註: 預設回傳單一聚合物件，n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+註: option.returnList為true時改回與輸入等長且保序之逐筆陣列，供呼叫端得知[是哪幾筆]為新數據，
+聚合計數僅能回答[有幾筆]，而去重類呼叫端須知何者為新方能對其執行下游動作
 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line426">line 426</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line432">line 432</a>
     </li></ul></dd>
     
 
@@ -1220,7 +1222,11 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
         <th>Type</th>
 
         
+        <th>Attributes</th>
+        
 
+        
+        <th>Default</th>
         
 
         <th class="last">Description</th>
@@ -1249,10 +1255,132 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
             </td>
 
             
+                <td class="attributes">
+                
 
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
             
 
             <td class="description last"><p>輸入數據物件或陣列</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>option</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>{}</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入設定物件，預設為{}</p>
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>returnList</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入是否改回逐筆結果陣列，預設為false。為true時回傳與輸入等長且保序之陣列，各元素為{ n, nInserted, ok }，已插入者nInserted為1、已存在而跳過者為0</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
         </tr>
 
     
@@ -1278,7 +1406,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳插入結果，returnList為true時回傳逐筆結果陣列，reject回傳錯誤訊息</p>
 </div>
 
 
@@ -1328,7 +1456,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line638">line 638</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line682">line 682</a>
     </li></ul></dd>
     
 
@@ -1492,7 +1620,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1128">line 1128</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1172">line 1172</a>
     </li></ul></dd>
     
 
@@ -1656,7 +1784,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line856">line 856</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line900">line 900</a>
     </li></ul></dd>
     
 
@@ -1943,7 +2071,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line305">line 305</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line307">line 307</a>
     </li></ul></dd>
     
 
@@ -2123,7 +2251,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line362">line 362</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line364">line 364</a>
     </li></ul></dd>
     
 
@@ -2284,7 +2412,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1238">line 1238</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1282">line 1282</a>
     </li></ul></dd>
     
 
@@ -2441,7 +2569,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Aug 17 2026 11:28:35 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Aug 17 2026 18:43:44 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

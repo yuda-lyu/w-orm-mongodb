@@ -207,8 +207,9 @@ test()
 select(find)        → [ {...}, {...} ]                    無符合為 []
 selectByPk(pk)      → {...} | null
 
-insert(data)        → { n, nInserted, ok }
-insertBulk(data)    → { n, nInserted, ok }          衝突即整批reject且不寫入任何一筆
+insert(data, option)              → { n, nInserted, ok }
+insert(data, {returnList: true})  → [ { n, nInserted, ok }, ... ]   與輸入等長保序
+insertBulk(data)                  → { n, nInserted, ok }            衝突即整批reject且不寫入任何一筆
 save(data, option)  → [ { n, nInserted, nModified, ok }, ... ]
 del(data)           → [ { n, nDeleted, ok }, ... ]
 delAll(find)        → { n, nDeleted, ok }
@@ -234,6 +235,7 @@ delAll(find)        → { n, nDeleted, ok }
 |---|---|
 | 這批有沒有撞到既有主鍵 | `insertBulk`是否`reject` |
 | 這批有幾筆是新資料 | `insert`之`nInserted` |
+| 這批**是哪幾筆**是新資料 | `insert(data, {returnList: true})`之各元素`nInserted === 1` |
 | 這筆是不是新資料 | `save`之`nInserted === 1` |
 | 這筆內容有沒有實際寫入 | `save`之`nModified === 1` |
 | 這筆有沒有真的被刪 | `nDeleted` |
@@ -243,6 +245,35 @@ delAll(find)        → { n, nDeleted, ok }
 `save`之「內容相同」判定基準為**將待儲存物件合併進現值之後，結果與現值相同**，由MongoDB於伺服器端逐欄位比對。故僅給部份欄位且該些欄位值皆與現值相同時，`nModified`亦為`0`。
 
 `del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
+
+## insert 的 returnList
+
+聚合的`nInserted`回答「有幾筆是新的」，回答不了「**是哪幾筆**」——而後者正是去重的產出物（下游只對新資料做昂貴動作）。`option.returnList`把函數內部本就算出的逐筆判定交出來，免得呼叫端為了知道哪幾筆而把批次退化成單筆呼叫。
+
+| `option.returnList` | 回傳 |
+|---|---|
+| `false`（預設） | `{ n, nInserted, ok }` |
+| `true` | 與輸入**等長且保序**之陣列，元素為`{ n, nInserted, ok }` |
+
+逐筆元素：已插入者`nInserted`為`1`，主鍵已存在而跳過者（含同批重複之非首筆）為`0`；`n`與`ok`恆為`1`——`insert`的任何錯誤都是整批性錯誤而`reject`，故逐筆元素不出現`ok: 0`與`err`。
+
+```alias
+let rs = await wo.insert([
+    { id: 'a', name: 'x' },
+    { id: 'b', name: 'y' },  //假設b已存在
+    { id: 'c', name: 'z' },
+], { returnList: true })
+// => [ {n:1,nInserted:1,ok:1}, {n:1,nInserted:0,ok:1}, {n:1,nInserted:1,ok:1} ]
+
+//取出本次真正新增的那幾筆
+let rsNew = data.filter((v, k) => rs[k].nInserted === 1)
+```
+
+不變式：陣列長度等於輸入筆數，且`rs.filter(v => v.nInserted === 1).length`等於預設模式的`nInserted`。輸入無效時回`[]`。
+
+回傳形式的切換是**靜態**的——呼叫點寫死取值即知回傳形狀。兩種取值是兩份契約，共用的結果處理程式碼不要跨不同取值的呼叫點混用。
+
+`save`與`del`不提供此選項，因為它們本來就回等長保序的逐筆陣列，資訊已經在裡面（`rs[i].nInserted === 1`、`rs[i].nModified === 1`）；`insertBulk`也不提供，因為成功時逐筆恆為已插入（零資訊量）、失敗時整批`reject`而無部分結果。
 
 ## insert vs insertBulk
 

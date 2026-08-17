@@ -599,6 +599,192 @@ describe('insert', function() {
 })
 
 
+describe('insert returnList', function() {
+    let vans = {}
+    let vget = {}
+
+    before(async function() {
+        this.timeout(120000)
+
+        let cl = 'inslist'
+        let wo = WOrm(genOpt(cl))
+        await wo.delAll()
+
+        //預設不給option時之形狀須為單一聚合物件
+        vget[1] = await wo.insert([{ id: 'r1' }, { id: 'r2' }])
+
+        //明確給false時形狀同預設
+        vget[2] = await wo.insert({ id: 'r3' }, { returnList: false })
+
+        //開啟後須回與輸入等長且保序之陣列, 全新者nInserted皆為1
+        vget[3] = await wo.insert([{ id: 'r4' }, { id: 'r5' }, { id: 'r6' }], { returnList: true })
+
+        //對位正確: 中間那筆已存在, 僅該位置之nInserted為0
+        vget[4] = await wo.insert([
+            { id: 'r7' },
+            { id: 'r5' }, //已存在
+            { id: 'r8' },
+        ], { returnList: true })
+
+        //同批含重複主鍵, 僅首筆之nInserted為1
+        vget[5] = await wo.insert([
+            { id: 'r9' },
+            { id: 'r9' },
+            { id: 'r9' },
+        ], { returnList: true })
+
+        //不變式: filter計數須等於聚合模式之nInserted
+        await wo.delAll()
+        let rsIn = [
+            { id: 's1' },
+            { id: 's2' },
+            { id: 's3' },
+            { id: 's4' },
+        ]
+        await wo.insert([{ id: 's2' }, { id: 's4' }]) //先寫入其中2筆
+        let rl = await wo.insert(rsIn, { returnList: true })
+        await wo.delAll()
+        await wo.insert([{ id: 's2' }, { id: 's4' }])
+        let rg = await wo.insert(rsIn)
+        vget[6] = rl.filter((v) => v.nInserted === 1).length
+        vget[7] = rg.nInserted
+        vget[8] = vget[6] === vget[7]
+
+        //逐筆元素之鍵集合須恰為n,nInserted,ok
+        vget[9] = rl.map(genKeys)
+
+        //輸入無效時開啟者回空陣列, 未開啟者回聚合物件
+        vget[10] = await wo.insert(null, { returnList: true })
+        vget[11] = await wo.insert(null)
+
+        //單一物件輸入亦須回長度為1之陣列
+        await wo.delAll()
+        vget[12] = await wo.insert({ id: 't1' }, { returnList: true })
+
+        //全數已存在時, 各元素之nInserted皆為0且不得reject
+        vget[13] = await wo.insert({ id: 't1' }, { returnList: true })
+
+        //change事件之res即本次實際回傳值
+        let woEv = WOrm(genOpt('inslistev'))
+        await woEv.delAll()
+        let resEv = null
+        woEv.on('change', function(mode, data, res) {
+            resEv = res
+        })
+        let rEv = await woEv.insert([{ id: 'v1' }, { id: 'v2' }], { returnList: true })
+        vget[14] = JSON.stringify(resEv) === JSON.stringify(rEv)
+
+        //autoGenPk為false且未帶id者仍為整批reject, 不因returnList而降為逐筆
+        let woOff = WOrm(genOptPk('inslistpkoff', false))
+        await woOff.delAll()
+        let rtOff = null
+        await woOff.insert([{ id: 'w1' }, { name: 'no-id' }], { returnList: true })
+            .then(function(msg) {
+                rtOff = `不應resolve: ${JSON.stringify(msg)}`
+            })
+            .catch(function(msg) {
+                rtOff = msg.toString()
+            })
+        vget[15] = rtOff
+        vget[16] = await woOff.selectByPk('w1')
+
+    })
+
+    vans[1] = { n: 2, nInserted: 2, ok: 1 }
+    it(`should get ${JSON.stringify(vans[1])} for insert without option`, async function() {
+        assert.strict.deepStrictEqual(vget[1], vans[1])
+    })
+
+    vans[2] = { n: 1, nInserted: 1, ok: 1 }
+    it(`should get ${JSON.stringify(vans[2])} for insert with returnList=false`, async function() {
+        assert.strict.deepStrictEqual(vget[2], vans[2])
+    })
+
+    vans[3] = [
+        { n: 1, nInserted: 1, ok: 1 },
+        { n: 1, nInserted: 1, ok: 1 },
+        { n: 1, nInserted: 1, ok: 1 }
+    ]
+    it(`should get ${JSON.stringify(vans[3])} for insert with returnList=true`, async function() {
+        assert.strict.deepStrictEqual(vget[3], vans[3])
+    })
+
+    vans[4] = [
+        { n: 1, nInserted: 1, ok: 1 },
+        { n: 1, nInserted: 0, ok: 1 },
+        { n: 1, nInserted: 1, ok: 1 }
+    ]
+    it(`should get ${JSON.stringify(vans[4])} for keeping order and position in returnList`, async function() {
+        assert.strict.deepStrictEqual(vget[4], vans[4])
+    })
+
+    vans[5] = [
+        { n: 1, nInserted: 1, ok: 1 },
+        { n: 1, nInserted: 0, ok: 1 },
+        { n: 1, nInserted: 0, ok: 1 }
+    ]
+    it(`should get ${JSON.stringify(vans[5])} for only first one inserted by duplicated id in same batch`, async function() {
+        assert.strict.deepStrictEqual(vget[5], vans[5])
+    })
+
+    vans[6] = 2
+    it(`should get ${JSON.stringify(vans[6])} for count of nInserted===1 in returnList`, async function() {
+        assert.strict.deepStrictEqual(vget[6], vans[6])
+    })
+
+    vans[7] = 2
+    it(`should get ${JSON.stringify(vans[7])} for nInserted in aggregated mode`, async function() {
+        assert.strict.deepStrictEqual(vget[7], vans[7])
+    })
+
+    vans[8] = true
+    it(`should get ${JSON.stringify(vans[8])} for same count between returnList and aggregated mode`, async function() {
+        assert.strict.deepStrictEqual(vget[8], vans[8])
+    })
+
+    vans[9] = ['n,nInserted,ok', 'n,nInserted,ok', 'n,nInserted,ok', 'n,nInserted,ok']
+    it(`should get ${JSON.stringify(vans[9])} for key set of returnList element`, async function() {
+        assert.strict.deepStrictEqual(vget[9], vans[9])
+    })
+
+    vans[10] = []
+    it(`should get ${JSON.stringify(vans[10])} for invalid data with returnList=true`, async function() {
+        assert.strict.deepStrictEqual(vget[10], vans[10])
+    })
+
+    vans[11] = { n: 0, nInserted: 0, ok: 1 }
+    it(`should get ${JSON.stringify(vans[11])} for invalid data with returnList=false`, async function() {
+        assert.strict.deepStrictEqual(vget[11], vans[11])
+    })
+
+    vans[12] = [{ n: 1, nInserted: 1, ok: 1 }]
+    it(`should get ${JSON.stringify(vans[12])} for single object with returnList=true`, async function() {
+        assert.strict.deepStrictEqual(vget[12], vans[12])
+    })
+
+    vans[13] = [{ n: 1, nInserted: 0, ok: 1 }]
+    it(`should get ${JSON.stringify(vans[13])} for all existed with returnList=true`, async function() {
+        assert.strict.deepStrictEqual(vget[13], vans[13])
+    })
+
+    vans[14] = true
+    it(`should get ${JSON.stringify(vans[14])} for res of change event being actual return value`, async function() {
+        assert.strict.deepStrictEqual(vget[14], vans[14])
+    })
+
+    vans[15] = 'Error: invalid data[1].id, autoGenPk is false'
+    it(`should get ${JSON.stringify(vans[15])} for autoGenPk=false with returnList=true`, async function() {
+        assert.strict.deepStrictEqual(vget[15], vans[15])
+    })
+
+    vans[16] = null
+    it(`should get ${JSON.stringify(vans[16])} for not writing valid records in rejected returnList batch`, async function() {
+        assert.strict.deepStrictEqual(vget[16], vans[16])
+    })
+
+})
+
+
 //insertBulk之語義與insert不同: insert跳過已存在者而整批ok為1, insertBulk則整批reject且不寫入任何一筆
 //本檔之容器為standalone, 無交易可用, 故走補償動作路徑; 交易路徑另見api-insertbulk-rs.test.mjs
 

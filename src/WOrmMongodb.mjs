@@ -1,6 +1,7 @@
 import mongodb from 'mongodb'
 import stream from 'stream'
 import cloneDeep from 'lodash-es/cloneDeep.js'
+import each from 'lodash-es/each.js'
 import every from 'lodash-es/every.js'
 import filter from 'lodash-es/filter.js'
 import get from 'lodash-es/get.js'
@@ -15,6 +16,7 @@ import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
+import isnum from 'wsemi/src/isnum.mjs'
 import isu8arr from 'wsemi/src/isu8arr.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
 
@@ -416,18 +418,31 @@ function WOrmMongodb(opt = {}) {
     /**
      * 插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
      * 由MongoDB於唯一索引上原子完成[檢查id未存在]與[寫入]，併發時同一id僅有一次成功
-     * 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+     * 註: 預設回傳單一聚合物件，n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
+     * 註: option.returnList為true時改回與輸入等長且保序之逐筆陣列，供呼叫端得知[是哪幾筆]為新數據，
+     * 聚合計數僅能回答[有幾筆]，而去重類呼叫端須知何者為新方能對其執行下游動作
      * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
-     * @returns {Promise} 回傳Promise，resolve回傳插入結果，reject回傳錯誤訊息
+     * @param {Object} [option={}] 輸入設定物件，預設為{}
+     * @param {Boolean} [option.returnList=false] 輸入是否改回逐筆結果陣列，預設為false。為true時回傳與輸入等長且保序之陣列，各元素為{ n, nInserted, ok }，已插入者nInserted為1、已存在而跳過者為0
+     * @returns {Promise} 回傳Promise，resolve回傳插入結果，returnList為true時回傳逐筆結果陣列，reject回傳錯誤訊息
      */
-    async function insert(data) {
+    async function insert(data, option = {}) {
         let isErr = false
+
+        //returnList
+        let returnList = get(option, 'returnList')
+        if (!isbol(returnList)) {
+            returnList = false
+        }
 
         //check
         if (!iseobj(data) && !isearr(data)) {
+            if (returnList) {
+                return []
+            }
             return {
                 n: 0,
                 nInserted: 0,
@@ -468,7 +483,10 @@ function WOrmMongodb(opt = {}) {
 
             //insertMany, ordered:false令已存在id者跳過而不中斷整批插入,
             //同批含重複id時亦僅首筆成功, 故不須逐筆插入即可取得實際插入筆數
+            //ordered:false時writeErrors之index即為未插入者於輸入內之位置, 其餘即為已插入者,
+            //故逐筆判定亦由本次同一往返取得, 不須額外查詢
             let nInserted = 0
+            let kpSkip = {}
             try {
                 let r = await collection.insertMany(data, { ordered: false })
                 nInserted = r.insertedCount
@@ -483,13 +501,39 @@ function WOrmMongodb(opt = {}) {
                 //重複鍵錯誤時仍可由result取得實際插入筆數
                 nInserted = get(err, 'result.insertedCount', 0)
 
+                //kpSkip, 記錄未插入者於輸入內之位置
+                each(get(err, 'writeErrors', []), function(v) {
+                    let k = get(v, 'index', get(v, 'err.index'))
+                    if (isnum(k)) {
+                        kpSkip[k] = true
+                    }
+                })
+
             }
 
-            //res, 全數已存在而nInserted為0屬正常結果, 不視為錯誤
-            res = {
-                n: nAll,
-                nInserted,
-                ok: 1,
+            //res
+            if (returnList) {
+
+                //res, 與輸入等長且保序, 各元素之n恆為1、ok恆為1,
+                //因insert之任何錯誤皆屬整批性錯誤而reject, 逐筆元素不出現ok為0與err
+                res = map(data, function(v, k) {
+                    return {
+                        n: 1,
+                        nInserted: kpSkip[k] === true ? 0 : 1,
+                        ok: 1,
+                    }
+                })
+
+            }
+            else {
+
+                //res, 全數已存在而nInserted為0屬正常結果, 不視為錯誤
+                res = {
+                    n: nAll,
+                    nInserted,
+                    ok: 1,
+                }
+
             }
 
         }
