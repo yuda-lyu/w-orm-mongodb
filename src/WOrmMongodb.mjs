@@ -8,7 +8,7 @@ import omit from 'lodash-es/omit.js'
 import size from 'lodash-es/size.js'
 import evem from 'wsemi/src/evem.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
-import genID from 'wsemi/src/genID.mjs'
+import genIDSeq from 'wsemi/src/genIDSeq.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
@@ -154,8 +154,8 @@ function WOrmMongodb(opt = {}) {
                 throw new Error(`invalid data[${k}].id, autoGenPk is false`)
             }
 
-            //genID
-            v.id = genID()
+            //genIDSeq
+            v.id = genIDSeq()
 
         }
 

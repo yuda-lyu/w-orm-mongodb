@@ -281,7 +281,7 @@ wo.on('error', function(mode, data, err) {
 
 | `opt.autoGenPk` | 行為 |
 |---|---|
-| `true`（預設） | `insert`、`save`、`insertGfs`於輸入未帶有效`id`時，由套件以`genID()`自動產生 |
+| `true`（預設） | `insert`、`save`、`insertGfs`於輸入未帶有效`id`時，由套件以`genIDSeq()`自動產生（UUIDv7，時間有序） |
 | `false` | 套件一律不產生`id`，`id`須由呼叫端於寫入前自備 |
 
 `autoGenPk: false`之定位為**依賴注入**：`id`的產生規則改由呼叫端掌握（如採用外部發號器、以業務欄位組合、沿用上游系統既有識別碼），套件不介入。採用此設定後，**`id`之唯一性、格式與是否與既有資料衝突，皆由呼叫端自負**。
