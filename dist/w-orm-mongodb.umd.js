@@ -1,5 +1,5 @@
 /*!
- * w-orm-mongodb v1.2.1
+ * w-orm-mongodb v1.2.2
  * (c) 2018-2021 yuda-lyu(semisphere)
  * Released under the MIT License.
  */
