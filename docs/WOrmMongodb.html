@@ -83,7 +83,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line39">line 39</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line40">line 40</a>
     </li></ul></dd>
     
 
@@ -474,7 +474,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line980">line 980</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1000">line 1000</a>
     </li></ul></dd>
     
 
@@ -629,14 +629,31 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
-註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>依條件刪除多筆數據(破壞性操作，須審慎使用，非必要不用；刪除單筆請用del)，需與del分開，避免未傳數據導致直接刪除全表</p>
+<p>使用須知：</p>
+<ol>
+<li>不給條件即刪除全部數據：find未給、為undefined或為{}時，刪除資料表內全部數據，不另行確認。給了條件才是部分刪除。</li>
+<li>傳了值卻不是條件物件(null、陣列含[]與[{...}]、字串、數值、布林、函數、Date、RegExp、Map、Set、類別實例等)，
+一律整批reject，不視為{}，不刪除任何數據。</li>
+<li>條件僅支援系列白名單：欄位等值{欄:純量}(多欄為AND)、欄位運算子$eq $ne $gt $gte $lt $lte(值為純量)與
+$in $nin(值為純量陣列)、文件層$and $or(值為條件物件之非空陣列，最多1000項)。純量為字串、有限數字、布林、有效Date；
+null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $regex $options $exists $where $expr $text等)、
+欄位層$and/$or、點路徑、函數值、Symbol鍵、undefined值、空的$nin/$and/$or等一律整批reject，
+訊息為invalid find: 原因 at [路徑]，且不連線、不刪除任何數據。</li>
+<li>與select共用同一檢核與同一條件，select(find)命中之數據即本函數刪除之數據；
+建議先以select(find)確認命中範圍再刪除。</li>
+<li>條件值若來自可能為undefined、null或空陣列之變數，呼叫端須先自行判斷；undefined值會reject而非被忽略，
+空的$nin會reject，$in:[]則為恆假(刪除0筆)。</li>
+<li>語意差異(MongoDB式，依伺服器原生行為，見README)：$ne(比較值非null)與$nin會命中欄位為null或缺欄之數據，$ne:null則僅命中欄位存在且非null者。
+需明確表達時可用可攜寫法：排除null為{$and:[{f:{$ne:null}},{f:{$ne:x}}]}，含null為{$or:[{f:null},{f:{$ne:x}}]}。</li>
+</ol>
+<p>註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1108">line 1108</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1145">line 1145</a>
     </li></ul></dd>
     
 
@@ -745,7 +762,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
                 </td>
             
 
-            <td class="description last"><p>輸入刪除條件物件</p></td>
+            <td class="description last"><p>輸入刪除條件物件(系列白名單，規則見使用須知)，不給予find則代表刪除全部數據</p></td>
         </tr>
 
     
@@ -808,15 +825,29 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除全部數據，需與delGfs分開，避免未傳數據導致直接刪除全部
-註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果
+    <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，依條件刪除多筆數據(破壞性操作，須審慎使用，非必要不用；刪除單筆請用delGfs)，需與delGfs分開，避免未傳數據導致直接刪除全部</p>
+<p>使用須知：</p>
+<ol>
+<li>不給條件即刪除全部數據：find未給、為undefined或為{}時，刪除全部檔案，不另行確認。給了條件才是部分刪除。</li>
+<li>傳了值卻不是條件物件(null、陣列含[]與[{...}]、字串、數值、布林、函數、Date、RegExp、Map、Set、類別實例等)，
+一律整批reject，不視為{}，不刪除任何數據。</li>
+<li>條件僅支援系列白名單，規則與delAll相同，條件作用於GridFS之<cl>.files文件(欄位如filename、length、uploadDate)：
+欄位等值{欄:純量}(多欄為AND)、欄位運算子$eq $ne $gt $gte $lt $lte(值為純量)與$in $nin(值為純量陣列)、
+文件層$and $or(值為條件物件之非空陣列，最多1000項)。白名單外之運算子($not $nor $regex $options $exists $where $expr $text等)、
+欄位層$and/$or、點路徑(如metadata.*)、函數值、Symbol鍵、undefined值、空的$nin/$and/$or等一律整批reject，
+訊息為invalid find: 原因 at [路徑]，且不連線、不刪除任何數據。</li>
+<li>條件值若來自可能為undefined、null或空陣列之變數，呼叫端須先自行判斷；undefined值會reject而非被忽略，
+空的$nin會reject，$in:[]則為恆假(刪除0筆)。</li>
+<li>語意差異(MongoDB式，依伺服器原生行為)：$ne(比較值非null)與$nin會命中欄位為null或缺欄之數據，$ne:null則僅命中欄位存在且非null者。</li>
+</ol>
+<p>註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果
 本函數不建立唯一索引，以免既有數據尚存重複id時無法清除</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1562">line 1562</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1632">line 1632</a>
     </li></ul></dd>
     
 
@@ -925,7 +956,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
                 </td>
             
 
-            <td class="description last"><p>輸入刪除條件物件</p></td>
+            <td class="description last"><p>輸入刪除條件物件(系列白名單，規則見使用須知)，不給予find則代表刪除全部數據</p></td>
         </tr>
 
     
@@ -990,13 +1021,14 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除數據
 註: n為id命中筆數；未帶有效id者視為本筆無法處理，以ok為0並附err回報；
+id含NUL或孤立代理字元者不符系列條件白名單，尚未查找即以ok為0、n為0並附err(invalid find: ...)回報，不影響同批其他筆；
 判斷本筆是否真的被刪除一律以nDeleted為準</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1418">line 1418</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1471">line 1471</a>
     </li></ul></dd>
     
 
@@ -1162,7 +1194,7 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line432">line 432</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line452">line 452</a>
     </li></ul></dd>
     
 
@@ -1456,7 +1488,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line682">line 682</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line702">line 702</a>
     </li></ul></dd>
     
 
@@ -1620,7 +1652,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1172">line 1172</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1220">line 1220</a>
     </li></ul></dd>
     
 
@@ -1784,7 +1816,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line900">line 900</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line920">line 920</a>
     </li></ul></dd>
     
 
@@ -2065,13 +2097,20 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>查詢數據</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>查詢數據</p>
+<p>條件(find)僅支援系列白名單，規則同delAll之第1-3點，詳見README之條件(find)白名單：
+欄位等值{欄:純量}(多欄為AND)、欄位運算子$eq $ne $gt $gte $lt $lte(值為純量)與$in $nin(值為純量陣列)、
+文件層$and $or(值為條件物件之非空陣列)；未給、undefined或{}回傳全部數據；
+非條件物件或白名單外之輸入(如$regex $where $exists $not $nor、點路徑、undefined值、函數值)整批reject，
+訊息為invalid find: 原因 at [路徑]，且不連線、不讀取。
+語意差異(MongoDB式)：$ne(比較值非null)與$nin會命中欄位為null或缺欄之數據，$ne:null則僅命中欄位存在且非null者，需明確表達時可用可攜寫法，
+排除null為{$and:[{f:{$ne:null}},{f:{$ne:x}}]}，含null為{$or:[{f:null},{f:{$ne:x}}]}。</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line307">line 307</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line316">line 316</a>
     </li></ul></dd>
     
 
@@ -2180,7 +2219,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
                 </td>
             
 
-            <td class="description last"><p>輸入查詢條件物件</p></td>
+            <td class="description last"><p>輸入查詢條件物件(系列白名單，規則同delAll之第1-3點)，未給、undefined或{}回傳全部數據，非條件物件或白名單外運算子整批reject</p></td>
         </tr>
 
     
@@ -2251,7 +2290,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line364">line 364</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line384">line 384</a>
     </li></ul></dd>
     
 
@@ -2412,7 +2451,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1282">line 1282</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1330">line 1330</a>
     </li></ul></dd>
     
 
@@ -2569,7 +2608,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Oct 11 2026 13:55:32 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sat Oct 17 2026 14:13:30 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

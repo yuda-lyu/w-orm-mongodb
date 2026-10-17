@@ -8,6 +8,27 @@ An operator for mongodb in nodejs.
 [![npm download](https://img.shields.io/npm/dm/w-orm-mongodb.svg)](https://npmjs.org/package/w-orm-mongodb) 
 [![jsdelivr download](https://img.shields.io/jsdelivr/npm/hm/w-orm-mongodb.svg)](https://www.jsdelivr.com/package/npm/w-orm-mongodb)
 
+## 破壞性變更
+
+`select(find)`、`delAll(find)`、`delAllGfs(find)`之條件(find)改為**系列條件白名單**(`w-orm-*`系列一致，詳見下方「條件(find)白名單」)，白名單外之輸入一律於到達MongoDB之前以`invalid find: 原因 at [路徑]`整批`reject`，不設過渡期：
+
+| 項目 | 原行為 | 現行為 |
+|---|---|---|
+| `$regex`、`$options`、`$exists`、`$not`、`$nor`、`$where`、`$expr`、`$text`、`$jsonSchema`、`$comment`、`$type`、`$mod`、`$elemMatch`、`$size`、`$all`、地理空間等運算子 | 交由MongoDB伺服器處理(`$where`字串會於伺服器執行) | `reject` |
+| 點路徑(`{ 'a.b': 1 }`)、含連字號或空白之欄名、欄位層`$and`/`$or`、RegExp值、陣列值、巢狀物件等值 | 交由MongoDB伺服器處理 | `reject` |
+| 頂層為`null`、陣列、字串、數字、布林、函數、`Date`、`Map`、`Set`、類別實例等非條件物件 | 部分被驅動拒收；`Map`、`Set`、類別實例、僅Symbol鍵之物件被放行 | 一律`reject`，不視為`{}` |
+| 函數值、Symbol值、不可列舉鍵、稀疏陣列之洞 | 被BSON序列化略過，條件消失(`delAll`刪光全表) | `reject` |
+| 存取器(getter)屬性、Symbol鍵 | 存取器於序列化時被執行；Symbol鍵被忽略 | `reject` |
+| `undefined`值 | 被序列化為`null`，命中欄位為`null`或缺欄之數據 | `reject` |
+| NaN、±Infinity、無效`Date`、BigInt、Buffer、字串含NUL或孤立代理字元 | 依BSON表示交由MongoDB伺服器比對(多半無命中) | `reject` |
+| `$nin: []`、`$and: [{}]`、`$or: [{}]`、`$expr: true` | 條件為恆真，`delAll`刪光全表 | `reject` |
+| `$and: []`、`$or: []` | 由MongoDB伺服器拒收 | `reject`(改為連線前拒收，訊息為`invalid find: ...`) |
+| `{ f: {} }`、`{ f: { $ne: [20] } }` 等文件值或陣列值之等值比對 | 交由MongoDB伺服器依文件值或陣列值比對 | `reject` |
+| `$gt`、`$gte`、`$lt`、`$lte`之`null`值，`$in`、`$nin`元素含`null` | 交由MongoDB伺服器處理 | `reject`(`null`僅可用於欄位等值、`$eq`、`$ne`) |
+| `delAllGfs`之GridFS條件(含`delGfs`逐筆之`{ filename: id }`) | `metadata.*`等點路徑可用；`id`含NUL者可刪 | 同一白名單，點路徑不可用；`id`含NUL或孤立代理字元者`delGfs`該筆回`n: 0`、`ok: 0`與`err`(不論該`id`是否存在，不影響同批其他筆) |
+
+未變：`{}`、未給、`undefined`皆代表全部；白名單內之條件，命中集合不變(MongoDB式語意)；`select`回傳仍不含`_id`。需要被移除之功能者(如模糊比對)，請改為`select`後於記憶體過濾。
+
 ## Documentation
 To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-orm-mongodb/WOrmMongodb.html).
 
@@ -126,8 +147,10 @@ async function test() {
     let spc = await wo.select({ '$or': [{ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] }, { '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 400 } }] }] })
     console.log('select by $or, $and, $ne, $in, $nin', spc)
 
-    //select by regex, $options之合法flag僅有i、m、x、s
-    let sr = await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
+    //select by regex, $regex與$options不在條件(find)白名單內(會reject), 需要模糊比對時改為select後於記憶體過濾
+    let sr = ss.filter(function(v) {
+        return /PeT/i.test(v.name)
+    })
     console.log('selectReg', sr)
 
     //selectByPk, 由id直接查找單筆, 不需如select提取全部符合數據再處理
@@ -245,6 +268,36 @@ delAll(find)        → { n, nDeleted, ok }
 `save`之「內容相同」判定基準為**將待儲存物件合併進現值之後，結果與現值相同**，由MongoDB於伺服器端逐欄位比對。故僅給部份欄位且該些欄位值皆與現值相同時，`nModified`亦為`0`。
 
 `del`對未帶有效`id`者不送查詢條件，直接回`ok: 0`並附`err`，以免`undefined`經序列化為`null`而誤刪`id`為`null`之數據。
+
+## 條件(find)白名單
+
+`select(find)`、`delAll(find)`、`delAllGfs(find)`之`find`只支援下列系列白名單(`w-orm-*`系列一致)，其餘一律整批`reject`，訊息為`invalid find: 原因 at [路徑]`(不回顯值)，且不建立連線、不讀取、不刪除。檢核由`wsemi`之`cvOrmFind`負責，檢核後之條件副本才交給MongoDB(檢查之值即使用之值)。
+
+| 項目 | 說明 |
+|---|---|
+| 全部 | 未給、`undefined`、`{}`皆為全部數據。除此之外`find`須為一般物件(原型為`Object.prototype`或`null`)，`null`、陣列、字串、數值、布林、函數、`Date`、`RegExp`、`Map`、`Set`、類別實例等一律`reject`，不視為`{}` |
+| 欄位等值 | `{ 欄: 純量 }`，多欄為AND |
+| 欄位運算子 | `$eq $ne $gt $gte $lt $lte`(值為純量)、`$in $nin`(值為純量陣列) |
+| 文件層邏輯 | `$and`、`$or`(值為條件物件之非空陣列) |
+| 純量 | 字串、有限數字、布林、有效`Date`；`null`僅可用於欄位等值、`$eq`、`$ne`；字串不得含NUL與孤立代理字元 |
+| 空集合 | `$in: []`恆假(命中0筆)；`$nin: []`、`$and: []`、`$or: []`、`$and`/`$or`之元素為`{}`、運算子物件為`{}`一律`reject` |
+| 欄名 | 1~128個UTF-16碼元(以字串`length`計)，符合`^[\p{L}_][\p{L}\p{M}\p{N}_]*$`，禁`__proto__`；點路徑、`$`開頭、含連字號/空白/引號者`reject`。`_bsontype`為BSON保留欄名，雖符合文法，MongoDB driver無法將其作為一般欄位送出而會`reject`(不會命中或刪除任何數據) |
+| 上限 | 邏輯巢狀深度32、`$and`/`$or`長度1000、`$in`/`$nin`長度10000、節點總數100000 |
+| 其餘 | `$not $nor $regex $options $exists $type $where $expr $function $text $elemMatch $size $all $mod`、地理空間、欄位層`$and`/`$or`、`undefined`值、函數值、Symbol鍵與值等白名單外輸入一律`reject` |
+
+語意為MongoDB伺服器原生行為(MongoDB式)：
+
+- 欄位值以BSON型別比對，`{ age: '20' }`不命中數字`20`；字串區分大小寫。
+- `{ f: null }`、`{ f: { $eq: null } }`會命中欄位為`null`或缺欄之數據；因此欄名拼錯時，`delAll({ 拼錯之欄: null })`、`$ne`、`$nin`會命中全部數據，呼叫`delAll`前須確認欄名。
+- `$ne`(比較值非`null`)、`$nin`會命中欄位為`null`或缺欄之數據，`$ne: null`則僅命中欄位存在且非`null`者。需明確表達時可用可攜寫法(與`w-orm-*`其他套件之結果一致)：排除null為`{ $and: [{ f: { $ne: null } }, { f: { $ne: x } }] }`，含null為`{ $or: [{ f: null }, { f: { $ne: x } }] }`。
+- 同一`find`，`select`命中之數據即`delAll`刪除之數據。
+
+`delAll`/`delAllGfs`使用須知：
+
+- 不給條件(未給、`undefined`、`{}`)即刪除全部數據，不另行確認；給了條件才是部分刪除。經資料通道(如`w-serv-webdata`)呼叫者語意與本套件一致，不另加限制。
+- 傳了值卻不是條件物件(`null`、陣列、字串等)會整批`reject`，不會視為`{}`。
+- 條件須審慎：`undefined`值會`reject`而非被忽略，`$nin: []`會`reject`，`$in: []`為恆假(刪除0筆)；條件值若來自可能為`undefined`、`null`或空陣列之變數，呼叫端須先自行判斷。建議先以`select(find)`確認命中範圍再刪除。
+- `delAll`須審慎使用，非必要不用；刪除單筆請用`del`。
 
 ## insert 的 returnList
 
@@ -471,6 +524,8 @@ GridFS函數之參數與回傳形狀比照一般操作，數據物件為`{ id, u
 | `insertGfs(data)` | `insert` | `{ n, nInserted, ok }` |
 | `delGfs(data)` | `del` | `[ { n, nDeleted, ok }, ... ]` |
 | `delAllGfs(find)` | `delAll` | `{ n, nDeleted, ok }` |
+
+`delAllGfs(find)`之`find`適用上方「條件(find)白名單」(`<cl>.files`之欄位如`filename`、`length`、`uploadDate`可用，`metadata.*`等點路徑不可用)，不給條件即刪除全部檔案。
 
 `insertGfs`同樣具備「已存在則跳過」語義，以`<cl>.files`之`filename`唯一索引達成，升級前提與一般操作相同。GridFS無法於單一原子操作內取代既有內容，故不提供`saveGfs`，更新請以`delGfs`後再`insertGfs`完成。
 

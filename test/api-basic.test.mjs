@@ -290,9 +290,9 @@ describe('basic', function() {
             })
         vget[8] = rt
 
-        //select by regex, $options之合法flag僅有i、m、x、s, 給予無效flag時MongoDB會回MongoServerError
+        //select by regex, $regex與$options不在系列條件白名單內, 須於到達伺服器之前reject
         rt = null
-        // vans[9] = [{ id: 'id-peter', name: 'peter(modify)', value: 123 }]
+        // vans[9] = 'Error: invalid find: unsupported operator [$regex] at [find.name.$regex]'
         await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
             .then(function(msg) {
                 rt = msg
@@ -421,8 +421,8 @@ describe('basic', function() {
         assert.strict.deepStrictEqual(vget[8], vans[8])
     })
 
-    vans[9] = [{ id: 'id-peter', name: 'peter(modify)', value: 123 }]
-    it(`should get ${JSON.stringify(vans[9])} for select by regex`, async function() {
+    vans[9] = 'Error: invalid find: unsupported operator [$regex] at [find.name.$regex]'
+    it(`should get ${JSON.stringify(vans[9])} for select by regex (not in whitelist)`, async function() {
         assert.strict.deepStrictEqual(vget[9], vans[9])
     })
 

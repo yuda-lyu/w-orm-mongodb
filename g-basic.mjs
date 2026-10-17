@@ -104,8 +104,10 @@ async function test() {
     let spc = await wo.select({ '$or': [{ '$and': [{ value: { '$ne': 123 } }, { value: { '$in': [123, 321, 123.456, 456] } }, { value: { '$nin': [456, 654] } }] }, { '$or': [{ value: { '$lte': -1 } }, { value: { '$gte': 400 } }] }] })
     console.log('select by $or, $and, $ne, $in, $nin', spc)
 
-    //select by regex, $options之合法flag僅有i、m、x、s
-    let sr = await wo.select({ name: { $regex: 'PeT', $options: 'i' } })
+    //select by regex, $regex與$options不在條件(find)白名單內(會reject), 需要模糊比對時改為select後於記憶體過濾
+    let sr = ss.filter(function(v) {
+        return /PeT/i.test(v.name)
+    })
     console.log('selectReg', sr)
 
     //selectByPk, 由id直接查找單筆, 不需如select提取全部符合數據再處理
