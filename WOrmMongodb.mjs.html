@@ -55,6 +55,7 @@ import get from 'lodash-es/get.js'
 import map from 'lodash-es/map.js'
 import omit from 'lodash-es/omit.js'
 import size from 'lodash-es/size.js'
+import cvOrmFind from 'wsemi/src/cvOrmFind.mjs'
 import evem from 'wsemi/src/evem.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
 import genIDSeq from 'wsemi/src/genIDSeq.mjs'
@@ -347,19 +348,33 @@ function WOrmMongodb(opt = {}) {
     /**
      * 查詢數據
      *
+     * 條件(find)僅支援系列白名單，規則同delAll之第1-3點，詳見README之條件(find)白名單：
+     * 欄位等值{欄:純量}(多欄為AND)、欄位運算子$eq $ne $gt $gte $lt $lte(值為純量)與$in $nin(值為純量陣列)、
+     * 文件層$and $or(值為條件物件之非空陣列)；未給、undefined或{}回傳全部數據；
+     * 非條件物件或白名單外之輸入(如$regex $where $exists $not $nor、點路徑、undefined值、函數值)整批reject，
+     * 訊息為invalid find: 原因 at [路徑]，且不連線、不讀取。
+     * 語意差異(MongoDB式)：$ne(比較值非null)與$nin會命中欄位為null或缺欄之數據，$ne:null則僅命中欄位存在且非null者，需明確表達時可用可攜寫法，
+     * 排除null為{$and:[{f:{$ne:null}},{f:{$ne:x}}]}，含null為{$or:[{f:null},{f:{$ne:x}}]}。
+     *
      * @memberOf WOrmMongodb
-     * @param {Object} [find={}] 輸入查詢條件物件
+     * @param {Object} [find={}] 輸入查詢條件物件(系列白名單，規則同delAll之第1-3點)，未給、undefined或{}回傳全部數據，非條件物件或白名單外運算子整批reject
      * @returns {Promise} 回傳Promise，resolve回傳數據陣列，無符合數據回傳空陣列，reject回傳錯誤訊息
      */
     async function select(find = {}) {
         let isErr = false
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
+
+            //cvOrmFind, 須先於建立client與任何讀取, 不合白名單者往外拋(整批性錯誤), 其後一律只用檢核後之複本(檢查之值即使用之值)
+            find = cvOrmFind(find)
+
+            //client
+            client = new MongoClient(opt.url)
 
             //database, collection
             let database = client.db(opt.db)
@@ -383,8 +398,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 條件檢核失敗時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //check
@@ -1145,22 +1165,45 @@ function WOrmMongodb(opt = {}) {
 
 
     /**
-     * 刪除全部數據，需與del分開，避免未傳數據導致直接刪除全表
+     * 依條件刪除多筆數據(破壞性操作，須審慎使用，非必要不用；刪除單筆請用del)，需與del分開，避免未傳數據導致直接刪除全表
+     *
+     * 使用須知：
+     * 1. 不給條件即刪除全部數據：find未給、為undefined或為{}時，刪除資料表內全部數據，不另行確認。給了條件才是部分刪除。
+     * 2. 傳了值卻不是條件物件(null、陣列含[]與[{...}]、字串、數值、布林、函數、Date、RegExp、Map、Set、類別實例等)，
+     *    一律整批reject，不視為{}，不刪除任何數據。
+     * 3. 條件僅支援系列白名單：欄位等值{欄:純量}(多欄為AND)、欄位運算子$eq $ne $gt $gte $lt $lte(值為純量)與
+     *    $in $nin(值為純量陣列)、文件層$and $or(值為條件物件之非空陣列，最多1000項)。純量為字串、有限數字、布林、有效Date；
+     *    null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $regex $options $exists $where $expr $text等)、
+     *    欄位層$and/$or、點路徑、函數值、Symbol鍵、undefined值、空的$nin/$and/$or等一律整批reject，
+     *    訊息為invalid find: 原因 at [路徑]，且不連線、不刪除任何數據。
+     * 4. 與select共用同一檢核與同一條件，select(find)命中之數據即本函數刪除之數據；
+     *    建議先以select(find)確認命中範圍再刪除。
+     * 5. 條件值若來自可能為undefined、null或空陣列之變數，呼叫端須先自行判斷；undefined值會reject而非被忽略，
+     *    空的$nin會reject，$in:[]則為恆假(刪除0筆)。
+     * 6. 語意差異(MongoDB式，依伺服器原生行為，見README)：$ne(比較值非null)與$nin會命中欄位為null或缺欄之數據，$ne:null則僅命中欄位存在且非null者。
+     *    需明確表達時可用可攜寫法：排除null為{$and:[{f:{$ne:null}},{f:{$ne:x}}]}，含null為{$or:[{f:null},{f:{$ne:x}}]}。
+     *
      * 註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果
      *
      * @memberOf WOrmMongodb
-     * @param {Object} [find={}] 輸入刪除條件物件
+     * @param {Object} [find={}] 輸入刪除條件物件(系列白名單，規則見使用須知)，不給予find則代表刪除全部數據
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
     async function delAll(find = {}) {
         let isErr = false
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
+
+            //cvOrmFind, 須先於建立client與任何刪除, 不合白名單者往外拋(整批性錯誤), 其後一律只用檢核後之複本(檢查之值即使用之值), 複本無自有鍵代表全部
+            find = cvOrmFind(find)
+
+            //client
+            client = new MongoClient(opt.url)
 
             //database, collection
             let database = client.db(opt.db)
@@ -1185,8 +1228,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 條件檢核失敗時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -1427,12 +1475,16 @@ function WOrmMongodb(opt = {}) {
 
 
     //_findGfs, 內部查找函數, 其reject由delGfs與delAllGfs之catch接住並於該處發出error事件, 故本函數不自行發出
+    //註: bucket.find之唯一入口, 條件(find)須符合系列白名單, 故於查找前再經cvOrmFind(對delAllGfs已檢核之複本為冪等), delGfs逐筆之{ filename: id }亦經此
     async function _findGfs(find = {}, bucket) {
         let isErr = false
 
         //res
         let res = null
         try {
+
+            //cvOrmFind, 不合白名單者往外拋, 其後只用檢核後之複本
+            find = cvOrmFind(find)
 
             //find
             let cursor = bucket.find(find)
@@ -1456,6 +1508,7 @@ function WOrmMongodb(opt = {}) {
     /**
      * 使用GridFS，刪除數據
      * 註: n為id命中筆數；未帶有效id者視為本筆無法處理，以ok為0並附err回報；
+     * id含NUL或孤立代理字元者不符系列條件白名單，尚未查找即以ok為0、n為0並附err(invalid find: ...)回報，不影響同批其他筆；
      * 判斷本筆是否真的被刪除一律以nDeleted為準
      *
      * @memberOf WOrmMongodb
@@ -1542,12 +1595,15 @@ function WOrmMongodb(opt = {}) {
 
                         //本筆失敗不中斷整批
 
-                        //rest
+                        //errMsg
+                        let errMsg = getErrMsg(err)
+
+                        //rest, 條件未通過白名單檢核者(id含NUL或孤立代理字元)尚未查找, 視同無效id而n為0, 其餘為查找或刪除途中失敗, 本筆已嘗試而n為1
                         rest = {
-                            n: 1,
+                            n: errMsg.indexOf('invalid find: ') === 0 ? 0 : 1,
                             nDeleted: 0,
                             ok: 0,
-                            err: getErrMsg(err),
+                            err: errMsg,
                         }
 
                     }
@@ -1598,23 +1654,43 @@ function WOrmMongodb(opt = {}) {
 
 
     /**
-     * 使用GridFS，刪除全部數據，需與delGfs分開，避免未傳數據導致直接刪除全部
+     * 使用GridFS，依條件刪除多筆數據(破壞性操作，須審慎使用，非必要不用；刪除單筆請用delGfs)，需與delGfs分開，避免未傳數據導致直接刪除全部
+     *
+     * 使用須知：
+     * 1. 不給條件即刪除全部數據：find未給、為undefined或為{}時，刪除全部檔案，不另行確認。給了條件才是部分刪除。
+     * 2. 傳了值卻不是條件物件(null、陣列含[]與[{...}]、字串、數值、布林、函數、Date、RegExp、Map、Set、類別實例等)，
+     *    一律整批reject，不視為{}，不刪除任何數據。
+     * 3. 條件僅支援系列白名單，規則與delAll相同，條件作用於GridFS之&lt;cl>.files文件(欄位如filename、length、uploadDate)：
+     *    欄位等值{欄:純量}(多欄為AND)、欄位運算子$eq $ne $gt $gte $lt $lte(值為純量)與$in $nin(值為純量陣列)、
+     *    文件層$and $or(值為條件物件之非空陣列，最多1000項)。白名單外之運算子($not $nor $regex $options $exists $where $expr $text等)、
+     *    欄位層$and/$or、點路徑(如metadata.*)、函數值、Symbol鍵、undefined值、空的$nin/$and/$or等一律整批reject，
+     *    訊息為invalid find: 原因 at [路徑]，且不連線、不刪除任何數據。
+     * 4. 條件值若來自可能為undefined、null或空陣列之變數，呼叫端須先自行判斷；undefined值會reject而非被忽略，
+     *    空的$nin會reject，$in:[]則為恆假(刪除0筆)。
+     * 5. 語意差異(MongoDB式，依伺服器原生行為)：$ne(比較值非null)與$nin會命中欄位為null或缺欄之數據，$ne:null則僅命中欄位存在且非null者。
+     *
      * 註: n為實際刪除筆數，恆等於nDeleted；條件無命中時回傳0亦屬正常結果
      * 本函數不建立唯一索引，以免既有數據尚存重複id時無法清除
      *
      * @memberOf WOrmMongodb
-     * @param {Object} [find={}] 輸入刪除條件物件
+     * @param {Object} [find={}] 輸入刪除條件物件(系列白名單，規則見使用須知)，不給予find則代表刪除全部數據
      * @returns {Promise} 回傳Promise，resolve回傳刪除結果，reject回傳錯誤訊息
      */
     async function delAllGfs(find = {}) {
         let isErr = false
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
+
+            //cvOrmFind, 須先於建立client與任何刪除, 不合白名單者往外拋(整批性錯誤), 其後一律只用檢核後之複本(檢查之值即使用之值), 複本無自有鍵代表全部
+            find = cvOrmFind(find)
+
+            //client
+            client = new MongoClient(opt.url)
 
             //database
             let database = client.db(opt.db)
@@ -1653,8 +1729,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 條件檢核失敗時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -1707,7 +1788,7 @@ export default WOrmMongodb
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Oct 11 2026 13:55:32 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sat Oct 17 2026 14:13:30 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
