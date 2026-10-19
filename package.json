@@ -1,13 +1,13 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
     "mongodb": "^7.5.0",
-    "wsemi": "^1.9.19"
+    "wsemi": "^1.9.21"
   },
   "devDependencies": {
-    "w-package-tools": "^1.1.16"
+    "w-package-tools": "^1.1.21"
   },
   "scripts": {
     "test": "mocha --parallel \"test/*.test.mjs\" --timeout 180000",
