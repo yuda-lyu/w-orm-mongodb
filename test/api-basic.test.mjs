@@ -1330,7 +1330,7 @@ describe('del', function() {
         assert.strict.deepStrictEqual(vget[2], vans[2])
     })
 
-    vans[3] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+    vans[3] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[0].id]' }]
     it(`should get ${JSON.stringify(vans[3])} for del without valid id`, async function() {
         assert.strict.deepStrictEqual(vget[3], vans[3])
     })
@@ -1345,7 +1345,7 @@ describe('del', function() {
         assert.strict.deepStrictEqual(vget[5], vans[5])
     })
 
-    vans[6] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[]' }]
+    vans[6] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id: string is empty at [data[0].id]' }]
     it(`should get ${JSON.stringify(vans[6])} for del with empty id`, async function() {
         assert.strict.deepStrictEqual(vget[6], vans[6])
     })
@@ -1357,7 +1357,7 @@ describe('del', function() {
 
     vans[8] = [
         { n: 1, nDeleted: 1, ok: 1 },
-        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }
+        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[1].id]' }
     ]
     it(`should get ${JSON.stringify(vans[8])} for del with mixed valid and invalid id`, async function() {
         assert.strict.deepStrictEqual(vget[8], vans[8])
@@ -1637,7 +1637,7 @@ describe('error event', function() {
 
     vans[14] = [
         { n: 1, nDeleted: 1, ok: 1 },
-        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }
+        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[1].id]' }
     ]
     it(`should get ${JSON.stringify(vans[14])} for result with throwing error listener`, async function() {
         assert.strict.deepStrictEqual(vget[14], vans[14])
@@ -1965,7 +1965,7 @@ describe('autoGenPk', function() {
         assert.strict.deepStrictEqual(vget[15], vans[15])
     })
 
-    vans[16] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+    vans[16] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[0].id]' }]
     it(`should get ${JSON.stringify(vans[16])} for del without id by autoGenPk=false`, async function() {
         assert.strict.deepStrictEqual(vget[16], vans[16])
     })

@@ -55,6 +55,8 @@ import get from 'lodash-es/get.js'
 import map from 'lodash-es/map.js'
 import omit from 'lodash-es/omit.js'
 import size from 'lodash-es/size.js'
+import chkOrmData from 'wsemi/src/chkOrmData.mjs'
+import chkOrmStr from 'wsemi/src/chkOrmStr.mjs'
 import cvOrmFind from 'wsemi/src/cvOrmFind.mjs'
 import evem from 'wsemi/src/evem.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
@@ -75,6 +77,14 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
  * 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。id為無業務語義之識別碼。
  * opt.autoGenPk預設為true，insert、save與insertGfs於輸入未帶有效id時自動產生；del於任一設定下皆不補值。
  * opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。
+ *
+ * 字串良構檢核(w-orm系列一致，不隨opt.autoGenPk改變)：BSON會把孤立代理字元(String.prototype.isWellFormed()為false者)無聲改寫為U+FFFD，
+ * 使不同id寫成同一id、鍵名撞鍵、寫入值與讀回值不同，故於到達MongoDB之前檢核並拒收：
+ * 主鍵id不得為空字串或含孤立代理字元、NUL；寫入資料(insert、insertBulk、save)之字串值與鍵名(含巢狀物件與陣列元素)不得含孤立代理字元(值之NUL不檢查)；
+ * opt.url、opt.db、opt.cl含孤立代理字元者於建構時throw(訊息invalid opt.&lt;名>: string contains lone surrogate)，建構時即取值，其後改動opt不影響本實例。
+ * insert、insertBulk、insertGfs整批reject且不寫入任何一筆；save、del、delGfs該筆ok為0並附err，同批其他筆照常；selectByPk、selectByPkGfs回傳null。
+ * 錯誤訊息為固定詞彙、不回顯值，如invalid id: string contains lone surrogate at [data[1].id]、invalid data: string contains lone surrogate at [data[1].meta.tags[0]]。
+ * 詳見README之字串良構檢核。
  *
  * @class
  * @param {Object} [opt={}] 輸入設定物件，預設{}
@@ -104,6 +114,21 @@ function WOrmMongodb(opt = {}) {
     if (!isbol(autoGenPk)) {
         autoGenPk = true
     }
+
+
+    //url, db, cl, 建構時取值並檢核, 其後一律使用此處之值(檢查之值即使用之值), 建構後改動opt不影響本實例
+    //孤立代理字元於BSON會被改寫為U+FFFD, 使兩個不同名稱共用同一資料表, 故不合格者於建構時往外拋; 僅檢核字串, 其餘型別維持既有行為
+    let url = opt.url
+    let db = opt.db
+    let cl = opt.cl
+    each({ url, db, cl }, function(v, name) {
+        if (typeof v === 'string') {
+            let r = chkOrmStr(v, { nul: false })
+            if (r !== null) {
+                throw new Error(`invalid opt.${name}: ${r}`)
+            }
+        }
+    })
 
 
     //_indexReady, 唯一索引只須建立一次, 以旗標記錄避免每次操作皆多一次round-trip
@@ -219,6 +244,81 @@ function WOrmMongodb(opt = {}) {
 
 
     /**
+     * 檢核單筆數據之主鍵值，須為字串且不得為空字串、含NUL或孤立代理字元
+     * 註: 孤立代理字元於BSON會被改寫為U+FFFD而命中或覆寫他筆，NUL則與系列條件(find)同標準一併拒收；
+     * String包裝物件亦視為非字串(BSON會以字元索引存成子文件)；
+     * 訊息為固定詞彙，不回顯值
+     *
+     * @ignore
+     * @param {*} id 輸入主鍵值
+     * @param {Number} k 輸入數據於陣列內之索引
+     * @returns {String|null} 回傳null(合格)或錯誤訊息字串
+     */
+    function chkPk(id, k) {
+
+        //chkOrmStr
+        let r = chkOrmStr(id)
+
+        //check, 空字串為字串但不是有效主鍵
+        if (r === null &amp;&amp; id === '') {
+            r = 'string is empty'
+        }
+
+        if (r !== null) {
+            return `invalid id: ${r} at [data[${k}].id]`
+        }
+        return null
+    }
+
+
+    /**
+     * 檢核單筆寫入數據，先檢核主鍵值，再檢核整份數據之字串值與鍵名(含巢狀物件與陣列元素)，不得含孤立代理字元
+     * 註: 須作用於已複製且已補齊主鍵之數據，且其後只使用該份數據(檢查之值即使用之值)
+     *
+     * @ignore
+     * @param {Object} v 輸入數據物件
+     * @param {Number} k 輸入數據於陣列內之索引
+     * @returns {String|null} 回傳null(合格)或錯誤訊息字串
+     */
+    function chkDoc(v, k) {
+
+        //chkPk
+        let msg = chkPk(v.id, k)
+        if (msg !== null) {
+            return msg
+        }
+
+        //chkOrmData, 值之NUL不檢查
+        let r = chkOrmData(v, { root: `data[${k}]` })
+        if (r !== null) {
+            return `invalid data: ${r.reason} at [${r.path}]`
+        }
+
+        return null
+    }
+
+
+    /**
+     * 補齊並檢核整批寫入數據，任一筆不合格即往外拋，以索引最小之不合格筆為準
+     * 註: 須於建立MongoClient與任何寫入之前一次完成，令整批性錯誤時同批之有效筆數亦不會被寫入
+     *
+     * @ignore
+     * @param {Array} data 輸入已複製之數據陣列
+     * @returns {Array} 回傳補齊主鍵之數據陣列
+     */
+    function procDocs(data) {
+        return map(data, function(v, k) {
+            v = procPk(v, k)
+            let msg = chkDoc(v, k)
+            if (msg !== null) {
+                throw new Error(msg)
+            }
+            return v
+        })
+    }
+
+
+    /**
      * 判定是否為唯一索引重複鍵錯誤(11000)，批次插入時須全部寫入錯誤皆為重複鍵才算
      *
      * @ignore
@@ -281,7 +381,7 @@ function WOrmMongodb(opt = {}) {
         }
 
         //createIndex, 已存在同樣索引時MongoDB不會重建亦不報錯
-        await database.collection(`${opt.cl}.files`).createIndex({ filename: 1 }, { unique: true })
+        await database.collection(`${cl}.files`).createIndex({ filename: 1 }, { unique: true })
 
         //_indexGfsReady
         _indexGfsReady = true
@@ -374,11 +474,11 @@ function WOrmMongodb(opt = {}) {
             find = cvOrmFind(find)
 
             //client
-            client = new MongoClient(opt.url)
+            client = new MongoClient(url)
 
             //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
+            let database = client.db(db)
+            let collection = database.collection(cl)
 
             //find
             let cursor = collection.find(find)
@@ -423,6 +523,7 @@ function WOrmMongodb(opt = {}) {
      * 由主鍵查詢單筆數據，因由MongoDB查找且僅回傳單筆，不需如select提取全部符合數據再處理，故數據量大時效能較佳
      * 註: 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定
      * 註: 本函數不得有副作用，故不建立唯一索引
+     * 註: 主鍵值含NUL或孤立代理字元者視為無效(BSON會把孤立代理字元改寫為U+FFFD而命中他筆)，不連線並回傳null
      *
      * @memberOf WOrmMongodb
      * @param {String} pk 輸入主鍵值字串，即數據之id
@@ -431,22 +532,25 @@ function WOrmMongodb(opt = {}) {
     async function selectByPk(pk) {
         let isErr = false
 
-        //check
-        if (!isestr(pk)) {
-            //未給有效主鍵值視為查無數據, 判定基準與insert、save、del內對id之認定一致
+        //check, 判定基準與insert、save、del內對id之認定一致
+        if (!isestr(pk) || chkOrmStr(pk) !== null) {
+            //未給有效主鍵值視為查無數據
             return null
         }
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
 
+            //client
+            client = new MongoClient(url)
+
             //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
+            let database = client.db(db)
+            let collection = database.collection(cl)
 
             //findOne, 以投影去除_id, 令回傳形狀與select一致
             let v = await collection.findOne({ id: pk }, { projection: { _id: 0 } })
@@ -466,8 +570,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //check
@@ -489,6 +598,8 @@ function WOrmMongodb(opt = {}) {
      * 註: option.returnList為true時改回與輸入等長且保序之逐筆陣列，供呼叫端得知[是哪幾筆]為新數據，
      * 聚合計數僅能回答[有幾筆]，而去重類呼叫端須知何者為新方能對其執行下游動作
      * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，
+     * 訊息為invalid id: 原因 at [data[k].id]或invalid data: 原因 at [data[k].路徑]，以索引最小之不合格筆為準，不回顯值，error事件於reject前發出一次
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
@@ -521,26 +632,29 @@ function WOrmMongodb(opt = {}) {
         data = cloneDeep(data)
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
-
-            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
-            await client.connect()
-
-            //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
 
             //check
             if (!isarr(data)) {
                 data = [data]
             }
 
-            //check id, 須於任何寫入之前一次完成, 令autoGenPk為false而拋錯時同批之有效筆數亦不會被寫入
-            data = map(data, procPk)
+            //check id與data, 須先於建立client與任何寫入且於已複製之數據上一次完成, 令整批性錯誤時同批之有效筆數亦不會被寫入
+            data = procDocs(data)
+
+            //client
+            client = new MongoClient(url)
+
+            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
+            await client.connect()
+
+            //database, collection
+            let database = client.db(db)
+            let collection = database.collection(cl)
 
             //ensureIndex
             await ensureIndex(collection)
@@ -609,8 +723,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 檢核失敗或url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -647,7 +766,7 @@ function WOrmMongodb(opt = {}) {
         }
 
         //hello
-        let hello = await client.db(opt.db).admin().command({ hello: 1 })
+        let hello = await client.db(db).admin().command({ hello: 1 })
 
         //_canUseTx
         _canUseTx = isestr(get(hello, 'setName')) || get(hello, 'msg') === 'isdbgrid'
@@ -739,6 +858,7 @@ function WOrmMongodb(opt = {}) {
      * 本函數則整批reject；需要逐筆處置者改用insert
      * 註: n為輸入筆數，nInserted於成功時恆等於n；不提供逐筆結果，故不出現ok為0與err
      * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，訊息格式同insert
      * 註: 全有全無之達成方式依部署而異——具replica set或分片叢集者以交易包覆，
      * standalone無交易可用而以補償動作達成，其限制詳見_insertBulkByCompensate
      *
@@ -762,26 +882,29 @@ function WOrmMongodb(opt = {}) {
         data = cloneDeep(data)
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
-
-            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
-            await client.connect()
-
-            //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
 
             //check
             if (!isarr(data)) {
                 data = [data]
             }
 
-            //check id, 須於任何寫入之前一次完成
-            data = map(data, procPk)
+            //check id與data, 須先於建立client與任何寫入且於已複製之數據上一次完成
+            data = procDocs(data)
+
+            //client
+            client = new MongoClient(url)
+
+            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
+            await client.connect()
+
+            //database, collection
+            let database = client.db(db)
+            let collection = database.collection(cl)
 
             //ensureIndex
             await ensureIndex(collection)
@@ -811,8 +934,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 檢核失敗或url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -840,9 +968,23 @@ function WOrmMongodb(opt = {}) {
      * @param {Object} collection 輸入資料表物件
      * @param {Object} v 輸入數據物件
      * @param {Boolean} autoInsert 輸入是否於查無數據時自動改以插入處理布林值
+     * @param {String|null} msgBad 輸入本筆主鍵或資料不合格之錯誤訊息，為字串時不送往伺服器，直接以ok為0回報
      * @returns {Promise} 回傳Promise，resolve回傳本筆儲存結果，本筆失敗時亦resolve並以ok為0回報
      */
-    async function saveOne(collection, v, autoInsert) {
+    async function saveOne(collection, v, autoInsert, msgBad) {
+
+        //check, 本筆不合格(孤立代理字元、NUL)者不得進入查詢與寫入, 以ok為0回報且每筆一次error事件
+        if (isestr(msgBad)) {
+            let restBad = {
+                n: 1,
+                nInserted: 0,
+                nModified: 0,
+                ok: 0,
+                err: msgBad,
+            }
+            emitError('save', [v], restBad.err)
+            return restBad
+        }
 
         //nTry, 併發upsert可能因他方同時插入同一id而拋重複鍵錯誤,
         //此時該id已存在, 重試即會走更新路徑, 故給予有限次數重試令其收斂
@@ -957,6 +1099,8 @@ function WOrmMongodb(opt = {}) {
      * 註: n為id命中筆數，命中或經插入而產生皆為1；[內容相同]之判定基準為將待儲存物件合併進現值後結果與現值相同，
      * 相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報
      * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，該筆以ok為0並附err(invalid id: …或invalid data: …，不回顯值)回報，
+     * 不送往伺服器，每筆一次error事件，同批其他筆照常；同批皆不合格時不連線
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
@@ -979,33 +1123,51 @@ function WOrmMongodb(opt = {}) {
         let autoInsert = get(option, 'autoInsert', true)
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
-
-            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
-            await client.connect()
-
-            //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
 
             //check
             if (!isarr(data)) {
                 data = [data]
             }
 
-            //check id, 須於任何寫入之前一次完成, 令autoGenPk為false而拋錯時同批之有效筆數亦不會被寫入
-            data = map(data, procPk)
+            //check id與data, 須先於建立client與任何寫入且於已複製之數據上一次完成;
+            //未帶有效id(autoGenPk為false)屬整批性錯誤而往外拋, 主鍵或資料不合格者僅該筆失敗(msgBads[k]), 同批其他筆照常
+            let msgBads = {}
+            data = map(data, function(v, k) {
+                v = procPk(v, k)
+                let msg = chkDoc(v, k)
+                if (msg !== null) {
+                    msgBads[k] = msg
+                }
+                return v
+            })
 
-            //ensureIndex
-            await ensureIndex(collection)
+            //collection, 同批皆不合格時無須連線, 逐筆直接回報失敗而不會用到
+            let collection = null
+            if (size(msgBads) &lt; size(data)) {
+
+                //client
+                client = new MongoClient(url)
+
+                //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
+                await client.connect()
+
+                //database, collection
+                let database = client.db(db)
+                collection = database.collection(cl)
+
+                //ensureIndex
+                await ensureIndex(collection)
+
+            }
 
             //pmSeries
-            res = await pmSeries(data, async(v) => {
-                return saveOne(collection, v, autoInsert)
+            res = await pmSeries(data, async(v, k) => {
+                return saveOne(collection, v, autoInsert, msgBads[k])
             })
 
         }
@@ -1014,8 +1176,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 檢核失敗或url無效或同批皆不合格時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -1037,7 +1204,8 @@ function WOrmMongodb(opt = {}) {
 
     /**
      * 刪除數據
-     * 註: n為id命中筆數；未帶有效id者視為本筆無法處理，不送查詢條件且以ok為0並附err回報；
+     * 註: n為id命中筆數；未帶有效id(非字串、空字串、含NUL或孤立代理字元)者視為本筆無法處理，不送查詢條件且以ok為0、n為0並附err(invalid id: 原因 at [data[k].id]，不回顯值)回報，
+     * 每筆一次error事件，同批其他筆照常，同批皆不合格時不連線；
      * 判斷本筆是否真的被刪除一律以nDeleted為準
      *
      * @memberOf WOrmMongodb
@@ -1056,42 +1224,64 @@ function WOrmMongodb(opt = {}) {
         data = cloneDeep(data)
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
-
-            //connect, 令連線失敗於刪除前即拋出, 屬影響全部數據之整批性錯誤
-            await client.connect()
-
-            //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
 
             //check
             if (!isarr(data)) {
                 data = [data]
             }
 
-            //pmSeries
-            res = await pmSeries(data, async(v) => {
+            //ids與msgBads, del不補值, 於已複製之數據上僅取一次id並檢核, 須先於建立client與任何刪除, 其後一律使用此處之id(檢查之值即使用之值);
+            //未帶有效id者視為本筆無法處理
+            let ids = map(data, function(v) {
+                return get(v, 'id')
+            })
+            let msgBads = {}
+            each(ids, function(id, k) {
+                let msg = chkPk(id, k)
+                if (msg !== null) {
+                    msgBads[k] = msg
+                }
+            })
 
-                //id, del不補值, 未帶有效id者視為本筆無法處理
-                let id = get(v, 'id')
+            //collection, 同批皆不合格時無須連線, 逐筆直接回報失敗而不會用到
+            let collection = null
+            if (size(msgBads) &lt; size(data)) {
+
+                //client
+                client = new MongoClient(url)
+
+                //connect, 令連線失敗於刪除前即拋出, 屬影響全部數據之整批性錯誤
+                await client.connect()
+
+                //database, collection
+                let database = client.db(db)
+                collection = database.collection(cl)
+
+            }
+
+            //pmSeries
+            res = await pmSeries(data, async(v, k) => {
+
+                //id
+                let id = ids[k]
 
                 //rest
                 let rest = null
 
-                //check, 不得將無效id送進查詢條件, 因undefined經序列化為null會誤中id為null之數據
-                if (!isestr(id)) {
+                //check, 不得將無效id送進查詢條件, 因undefined經序列化為null會誤中id為null之數據, 孤立代理字元會被改寫為U+FFFD而誤中他筆
+                if (isestr(msgBads[k])) {
 
                     //rest
                     rest = {
                         n: 0,
                         nDeleted: 0,
                         ok: 0,
-                        err: `invalid id[${id}]`,
+                        err: msgBads[k],
                     }
 
                 }
@@ -1143,8 +1333,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 同批皆不合格或url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -1203,11 +1398,11 @@ function WOrmMongodb(opt = {}) {
             find = cvOrmFind(find)
 
             //client
-            client = new MongoClient(opt.url)
+            client = new MongoClient(url)
 
             //database, collection
-            let database = client.db(opt.db)
-            let collection = database.collection(opt.cl)
+            let database = client.db(db)
+            let collection = database.collection(cl)
 
             //deleteMany
             let r = await collection.deleteMany(find)
@@ -1259,6 +1454,8 @@ function WOrmMongodb(opt = {}) {
      * 數據物件形狀為{ id, u8a }，u8a須為Uint8Array
      * 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
      * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: 主鍵id含孤立代理字元或NUL者於連線與寫入之前整批reject且同批皆不寫入(訊息invalid id: 原因 at [data[k].id]，不回顯值)；
+     * 本函數僅寫入id(檔名)與u8a(位元組)，其餘欄位不寫入故不檢核
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列，各數據物件形狀為{ id, u8a }
@@ -1277,26 +1474,11 @@ function WOrmMongodb(opt = {}) {
         }
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
-
-            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
-            await client.connect()
-
-            //database
-            let database = client.db(opt.db)
-
-            //bucket
-            let bucket = new mongodb.GridFSBucket(database, {
-                chunkSizeBytes: 10 * 1024 * 1024, //10mb
-                bucketName: opt.cl
-            })
-
-            //clChunks
-            let clChunks = database.collection(`${opt.cl}.chunks`)
 
             //check
             if (!isarr(data)) {
@@ -1305,15 +1487,38 @@ function WOrmMongodb(opt = {}) {
 
             //check id與u8a, 僅淺拷貝數據物件而不深拷貝u8a,
             //因u8a僅供讀取, 深拷貝大量二進位數據成本過高;
-            //u8a無效屬呼叫端給值錯誤且整批函數無從逐筆回報, 故往外拋
+            //u8a無效屬呼叫端給值錯誤且整批函數無從逐筆回報, 故往外拋;
+            //須先於建立client與任何寫入, 且id於此淺拷貝後檢核(檢查之值即使用之值); 本函數僅寫入id(檔名)與u8a(位元組), 其餘欄位不寫入故不檢核
             data = map(data, function(v, k) {
                 v = { ...v }
                 v = procPk(v, k)
+                let msg = chkPk(v.id, k)
+                if (msg !== null) {
+                    throw new Error(msg)
+                }
                 if (!isu8arr(v.u8a)) {
                     throw new Error(`invalid data[${k}].u8a`)
                 }
                 return v
             })
+
+            //client
+            client = new MongoClient(url)
+
+            //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
+            await client.connect()
+
+            //database
+            let database = client.db(db)
+
+            //bucket
+            let bucket = new mongodb.GridFSBucket(database, {
+                chunkSizeBytes: 10 * 1024 * 1024, //10mb
+                bucketName: cl
+            })
+
+            //clChunks
+            let clChunks = database.collection(`${cl}.chunks`)
 
             //ensureIndexGfs
             await ensureIndexGfs(database)
@@ -1343,8 +1548,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 檢核失敗或url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -1366,7 +1576,7 @@ function WOrmMongodb(opt = {}) {
 
     /**
      * 使用GridFS，由主鍵查詢單筆數據
-     * 註: 查無數據或主鍵值無效時回傳null，判定基準與selectByPk一致
+     * 註: 查無數據或主鍵值無效(非字串、空字串、含NUL或孤立代理字元)時回傳null，不連線，判定基準與selectByPk一致
      * 註: 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定
      * 本函數不得有副作用，故不建立唯一索引
      *
@@ -1377,14 +1587,14 @@ function WOrmMongodb(opt = {}) {
     async function selectByPkGfs(pk) {
         let isErr = false
 
-        //check
-        if (!isestr(pk)) {
-            //未給有效主鍵值視為查無數據, 判定基準與selectByPk一致
+        //check, 判定基準與selectByPk一致, 主鍵值含NUL或孤立代理字元者視為無效, 不連線
+        if (!isestr(pk) || chkOrmStr(pk) !== null) {
+            //未給有效主鍵值視為查無數據
             return null
         }
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //core
         let core = async (id) => {
@@ -1393,12 +1603,12 @@ function WOrmMongodb(opt = {}) {
             let pm = genPm()
 
             //database
-            let database = client.db(opt.db)
+            let database = client.db(db)
 
             //bucket
             let bucket = new mongodb.GridFSBucket(database, {
                 chunkSizeBytes: 10 * 1024 * 1024, //10mb
-                bucketName: opt.cl
+                bucketName: cl
             })
 
             //buf
@@ -1435,6 +1645,9 @@ function WOrmMongodb(opt = {}) {
         let res = null
         try {
 
+            //client
+            client = new MongoClient(url)
+
             //core
             let u8a = await core(pk)
 
@@ -1458,8 +1671,13 @@ function WOrmMongodb(opt = {}) {
 
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //check, 查無檔案已於catch內判定為正常結果而未設isErr, 故不會誤發error事件
@@ -1507,8 +1725,7 @@ function WOrmMongodb(opt = {}) {
 
     /**
      * 使用GridFS，刪除數據
-     * 註: n為id命中筆數；未帶有效id者視為本筆無法處理，以ok為0並附err回報；
-     * id含NUL或孤立代理字元者不符系列條件白名單，尚未查找即以ok為0、n為0並附err(invalid find: ...)回報，不影響同批其他筆；
+     * 註: n為id命中筆數；未帶有效id(非字串、空字串、含NUL或孤立代理字元)者視為本筆無法處理，尚未查找即以ok為0、n為0並附err(invalid id: ...，不回顯值)回報，不影響同批其他筆；
      * 判斷本筆是否真的被刪除一律以nDeleted為準
      *
      * @memberOf WOrmMongodb
@@ -1524,47 +1741,69 @@ function WOrmMongodb(opt = {}) {
         }
 
         //client
-        let client = new MongoClient(opt.url)
+        let client = null
 
         //res
         let res = null
         try {
 
-            //connect, 令連線失敗於刪除前即拋出, 屬影響全部數據之整批性錯誤
-            await client.connect()
-
-            //database
-            let database = client.db(opt.db)
-
-            //bucket
-            let bucket = new mongodb.GridFSBucket(database, {
-                chunkSizeBytes: 10 * 1024 * 1024, //10mb
-                bucketName: opt.cl
+            //data, 複製為普通陣列(元素不深拷貝, 僅取其id), 使其後ids、msgBads與逐筆處理之索引一致, 不受呼叫端改動陣列影響
+            data = map(isarr(data) ? data : [data], function(v) {
+                return v
             })
 
-            //check
-            if (!isarr(data)) {
-                data = [data]
+            //ids與msgBads, delGfs不補值, 僅取一次id並檢核, 須先於建立client與任何刪除, 其後一律使用此處之id(檢查之值即使用之值);
+            //未帶有效id者視為本筆無法處理
+            let ids = map(data, function(v) {
+                return get(v, 'id')
+            })
+            let msgBads = {}
+            each(ids, function(id, k) {
+                let msg = chkPk(id, k)
+                if (msg !== null) {
+                    msgBads[k] = msg
+                }
+            })
+
+            //bucket, 同批皆不合格時無須連線, 逐筆直接回報失敗而不會用到
+            let bucket = null
+            if (size(msgBads) &lt; size(data)) {
+
+                //client
+                client = new MongoClient(url)
+
+                //connect, 令連線失敗於刪除前即拋出, 屬影響全部數據之整批性錯誤
+                await client.connect()
+
+                //database
+                let database = client.db(db)
+
+                //bucket
+                bucket = new mongodb.GridFSBucket(database, {
+                    chunkSizeBytes: 10 * 1024 * 1024, //10mb
+                    bucketName: cl
+                })
+
             }
 
             //pmSeries
-            res = await pmSeries(data, async(v) => {
+            res = await pmSeries(data, async(v, k) => {
 
-                //id, delGfs不補值, 未帶有效id者視為本筆無法處理
-                let id = get(v, 'id')
+                //id
+                let id = ids[k]
 
                 //rest
                 let rest = null
 
                 //check, 判定基準與del一致
-                if (!isestr(id)) {
+                if (isestr(msgBads[k])) {
 
                     //rest
                     rest = {
                         n: 0,
                         nDeleted: 0,
                         ok: 0,
-                        err: `invalid id[${id}]`,
+                        err: msgBads[k],
                     }
 
                 }
@@ -1595,15 +1834,12 @@ function WOrmMongodb(opt = {}) {
 
                         //本筆失敗不中斷整批
 
-                        //errMsg
-                        let errMsg = getErrMsg(err)
-
-                        //rest, 條件未通過白名單檢核者(id含NUL或孤立代理字元)尚未查找, 視同無效id而n為0, 其餘為查找或刪除途中失敗, 本筆已嘗試而n為1
+                        //rest, 查找或刪除途中失敗, 本筆已嘗試而n為1
                         rest = {
-                            n: errMsg.indexOf('invalid find: ') === 0 ? 0 : 1,
+                            n: 1,
                             nDeleted: 0,
                             ok: 0,
-                            err: errMsg,
+                            err: getErrMsg(err),
                         }
 
                     }
@@ -1624,8 +1860,13 @@ function WOrmMongodb(opt = {}) {
             res = err
         }
         finally {
-            await client.close()
-            client = null
+
+            //client, 同批皆不合格或url無效時尚未建立
+            if (client !== null) {
+                await client.close()
+                client = null
+            }
+
         }
 
         //emit
@@ -1690,15 +1931,15 @@ function WOrmMongodb(opt = {}) {
             find = cvOrmFind(find)
 
             //client
-            client = new MongoClient(opt.url)
+            client = new MongoClient(url)
 
             //database
-            let database = client.db(opt.db)
+            let database = client.db(db)
 
             //bucket
             let bucket = new mongodb.GridFSBucket(database, {
                 chunkSizeBytes: 10 * 1024 * 1024, //10mb
-                bucketName: opt.cl
+                bucketName: cl
             })
 
             //_findGfs
@@ -1788,7 +2029,7 @@ export default WOrmMongodb
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Tue Oct 20 2026 01:59:19 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 21 2026 00:27:11 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

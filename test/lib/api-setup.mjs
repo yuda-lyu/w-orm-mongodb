@@ -100,8 +100,8 @@ let runContainer = async (ctName, genArgs) => {
             throw new Error('需先安裝並啟動docker才能執行mongodb測試')
         })
 
-    //清除前次殘留容器
-    await docker(['rm', '-f', ctName]).catch(() => {})
+    //清除前次殘留容器, -v連同映像宣告之匿名volume一併移除, 否則每次皆遺留懸置volume
+    await docker(['rm', '-f', '-v', ctName]).catch(() => {})
 
     //run
     let ctPort = null
@@ -131,7 +131,7 @@ let runContainer = async (ctName, genArgs) => {
         }
 
         //清除綁定失敗所遺留之容器
-        await docker(['rm', '-f', ctName]).catch(() => {})
+        await docker(['rm', '-f', '-v', ctName]).catch(() => {})
 
     }
 
@@ -207,9 +207,9 @@ let startContainerRs = async (ctName) => {
     return ctPort
 }
 
-//stopContainer, 銷毀容器
+//stopContainer, 銷毀容器, -v連同映像宣告之匿名volume一併移除(--rm僅於容器自行結束時清除, 以docker rm -f強制移除時不會帶走volume)
 let stopContainer = async (ctName) => {
-    await docker(['rm', '-f', ctName]).catch(() => {})
+    await docker(['rm', '-f', '-v', ctName]).catch(() => {})
 }
 
 

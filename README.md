@@ -10,6 +10,25 @@ An operator for mongodb in nodejs.
 
 ## 破壞性變更
 
+### 字串良構檢核(`w-orm-*`系列一致，詳見下方「字串良構檢核」)
+
+MongoDB的BSON會把孤立代理字元(UTF-16代理對被拆開後只剩一半，`String.prototype.isWellFormed()`為`false`者)無聲改寫為`U+FFFD`，使不同的`id`寫成同一個`id`(`insert`誤判已存在、`save`覆寫他筆、`del`誤刪他筆、`selectByPk`命中他筆)，文件內不同鍵名撞成同一鍵(值被覆蓋)，寫入值與讀回值不同。本版起於到達MongoDB之前檢核並拒收，不設過渡期：
+
+| 項目 | 原行為 | 現行為 |
+|---|---|---|
+| 主鍵`id`含孤立代理字元或NUL | 被BSON改寫為`U+FFFD`(NUL則照存)而命中或覆寫他筆 | `insert`/`insertBulk`/`insertGfs`整批`reject`且不寫入任何一筆；`save`/`del`/`delGfs`該筆`ok: 0`附`err`，同批其他筆照常；`selectByPk`/`selectByPkGfs`回`null` |
+| 寫入資料(`insert`/`insertBulk`/`save`)之字串值、鍵名(含巢狀物件、陣列元素、`Map`/`Set`內容)含孤立代理字元 | 被BSON改寫為`U+FFFD`，鍵名撞鍵時值被覆蓋 | `insert`/`insertBulk`整批`reject`；`save`該筆`ok: 0`附`err`。值與鍵名之NUL不檢查(鍵名含NUL仍由驅動拒收) |
+| `opt.url`、`opt.db`、`opt.cl`含孤立代理字元 | 兩個不同名稱改寫後共用同一資料表 | 建構時`throw` |
+| 非字串、空字串之`id`的`del`/`delGfs`錯誤訊息 | `invalid id[<回顯值>]` | 固定詞彙、不回顯值：`invalid id: not a string at [data[<k>].id]`、`invalid id: string is empty at [data[<k>].id]` |
+| `String`包裝物件(`new String('a')`)作為`id` | 被BSON以字元索引存成子文件(`{ 0: 'a' }`)，`selectByPk('a')`查不到 | 視為非字串而拒收(`invalid id: not a string …`) |
+| `delGfs`之`id`含NUL或孤立代理字元 | 該筆`ok: 0`，`err`為`invalid find: …` | 該筆`ok: 0`，`err`為`invalid id: … at [data[<k>].id]`，且`insertGfs`同樣拒收，不再有「可寫入卻刪不掉」之不對稱 |
+| 建構後改動`opt.url`/`opt.db`/`opt.cl` | 每次呼叫皆重讀`opt`，改動即時生效 | 建構時即取值並檢核，其後一律使用該值(檢查之值即使用之值)，建構後改動`opt`不影響已建立之實例，須重新建構 |
+| `opt.url`無效(如`http://…`、`mongodb://`、`not a url`) | `selectByPk`、`insert`、`insertBulk`、`save`、`del`、`insertGfs`、`selectByPkGfs`、`delGfs`同步`reject`但**不發`error`事件** | 11個函數一致：`reject`，且`error`事件於`reject`前恰發一次 |
+
+錯誤訊息一律為固定詞彙、不回顯值，與`select`/`delAll`之`invalid find`同一系列詞彙(見下方「字串良構檢核」)。
+
+### 條件(find)白名單
+
 `select(find)`、`delAll(find)`、`delAllGfs(find)`之條件(find)改為**系列條件白名單**(`w-orm-*`系列一致，詳見下方「條件(find)白名單」)，白名單外之輸入一律於到達MongoDB之前以`invalid find: 原因 at [路徑]`整批`reject`，不設過渡期：
 
 | 項目 | 原行為 | 現行為 |
@@ -25,7 +44,7 @@ An operator for mongodb in nodejs.
 | `$and: []`、`$or: []` | 由MongoDB伺服器拒收 | `reject`(改為連線前拒收，訊息為`invalid find: ...`) |
 | `{ f: {} }`、`{ f: { $ne: [20] } }` 等文件值或陣列值之等值比對 | 交由MongoDB伺服器依文件值或陣列值比對 | `reject` |
 | `$gt`、`$gte`、`$lt`、`$lte`之`null`值，`$in`、`$nin`元素含`null` | 交由MongoDB伺服器處理 | `reject`(`null`僅可用於欄位等值、`$eq`、`$ne`) |
-| `delAllGfs`之GridFS條件(含`delGfs`逐筆之`{ filename: id }`) | `metadata.*`等點路徑可用；`id`含NUL者可刪 | 同一白名單，點路徑不可用；`id`含NUL或孤立代理字元者`delGfs`該筆回`n: 0`、`ok: 0`與`err`(不論該`id`是否存在，不影響同批其他筆) |
+| `delAllGfs`之GridFS條件 | `metadata.*`等點路徑可用 | 同一白名單，點路徑不可用(`delGfs`之`id`含NUL或孤立代理字元者改由主鍵檢核拒收，見上方「字串良構檢核」) |
 
 未變：`{}`、未給、`undefined`皆代表全部；白名單內之條件，命中集合不變(MongoDB式語意)；`select`回傳仍不含`_id`。需要被移除之功能者(如模糊比對)，請改為`select`後於記憶體過濾。
 
@@ -422,6 +441,65 @@ let woOff = WOrm({ url, db: 'worm', cl: 'users', autoGenPk: false })
 await woOff.insert({ id: 'id-peter', name: 'peter' }) // => { n: 1, nInserted: 1, ok: 1 }
 await woOff.insert({ name: 'peter' })                 // => reject: invalid data[0].id, autoGenPk is false
 ```
+
+## 字串良構檢核
+
+BSON以UTF-8存放字串，**孤立代理字元**(高代理後無低代理，或低代理前無高代理，`String.prototype.isWellFormed()`為`false`)無法編碼而被改寫為`U+FFFD`，且不同的孤立字元(`'\uD800'`、`'\uDC00'`)與`U+FFFD`改寫後完全相同。若不檢核，`'a\uD800'`會與`'a�'`成為同一個`id`，造成覆寫、誤刪、命中他筆。本套件於到達MongoDB之前檢核並拒收(`U+FFFD`本身與成對代理，如emoji、CJK擴充B區字，為良構，照常接受)：
+
+| 檢核對象 | 規則 |
+|---|---|
+| 主鍵`id`(各函數之`id`/`pk`參數與資料之`id`欄) | 須為字串，不得為空字串，不得含孤立代理字元，**亦不得含NUL**(與`find`同標準) |
+| 寫入資料之字串值與鍵名(`insert`、`insertBulk`、`save`；含巢狀物件、陣列元素、`Map`/`Set`內容、`RegExp`之`source`、`Error`之`message`等) | 不得含孤立代理字元；值之NUL不檢查 |
+| 儲存位址`opt.url`、`opt.db`、`opt.cl` | 不得含孤立代理字元，建構時即`throw` |
+
+各函數之處置(與既有「無效主鍵」同形)：
+
+| 函數 | 處置 |
+|---|---|
+| `insert`、`insertBulk`、`insertGfs` | 寫入前檢核整批，任一筆不合格即整批`reject`、不連線、不寫入任何一筆；`error`事件於`reject`前發一次，`change`不發；以索引最小之不合格筆為準，同一筆內主鍵先於資料，同一物件內鍵名先於值 |
+| `save`、`del`、`delGfs` | 該筆回`ok: 0`並附`err`，同批其他筆照常；每個失敗筆各發一次`error`事件；同批皆不合格時不連線 |
+| `selectByPk`、`selectByPkGfs` | 回`null`(不`reject`、不發事件、不連線) |
+| `select`、`delAll`、`delAllGfs` | 條件值與欄名依「條件(find)白名單」(`invalid find: …`) |
+| 建構 `WOrm(opt)` | `opt.url`/`opt.db`/`opt.cl`不合格即`throw` |
+
+錯誤訊息為固定詞彙、不回顯值(路徑中之鍵名若不合格以`<invalid key>`標示)：
+
+```alias
+invalid id: string contains lone surrogate at [data[1].id]
+invalid id: string contains NUL at [data[1].id]
+invalid id: not a string at [data[1].id]            // del、delGfs：非字串；insert、insertBulk、insertGfs、save：String包裝物件(其餘非字串依autoGenPk補值或拒收，見上)
+invalid id: string is empty at [data[1].id]            // del、delGfs：空字串(insert、save於autoGenPk為true時會自動產生id)
+invalid data: string contains lone surrogate at [data[1].meta.tags[0]]
+invalid opt.cl: string contains lone surrogate
+```
+
+`[data[<k>]…]`之`<k>`為該筆在輸入陣列內之索引(單一物件為`0`)。`autoGenPk: false`而輸入未帶`id`時之既有訊息`invalid data[<k>].id, autoGenPk is false`不變。
+
+檢核**不隨`autoGenPk`改變**：`autoGenPk: false`時同樣檢核。檢核作用於套件已複製之數據(`insertGfs`、`delGfs`為取一次`id`)，檢查之值即寫入或查找之值。
+
+### 已知限制
+
+- `insertGfs`只寫入`id`(檔名)與`u8a`(內容為位元組)，其餘欄位不寫入，故不檢核資料之其他欄位；`u8a`內容不屬字串。
+- `String`包裝物件(`new String(...)`)作為**資料值**時，其字串值受檢核，但BSON以字元索引存成子文件，成對代理會被拆成孤立碼元，本套件不解包、不改存放形式；實務上資料不會使用`String`包裝物件。
+- 自訂`toJSON`/序列化函式之輸出不在檢核範圍。
+- 資料鍵名含NUL不由本套件檢核(值之NUL亦不檢查)，鍵名含NUL者由MongoDB驅動拒收，其錯誤訊息為驅動所產生，會含鍵名片段；本套件自身之訊息一律不回顯值。
+- 不合格筆之`n`：`save`為`1`(沿用既有逐筆失敗之形狀`{ n: 1, nInserted: 0, nModified: 0, ok: 0, err }`)，`del`/`delGfs`為`0`(`{ n: 0, nDeleted: 0, ok: 0, err }`)；判斷是否真的寫入或刪除請一律看`ok`、`nInserted`、`nModified`、`nDeleted`。
+
+### 既有資料
+
+本套件不自動遷移既有資料。舊版寫入之孤立代理字元**已被BSON改寫為`U+FFFD`**，內容已損且無從還原；因`U+FFFD`為良構字串，`isWellFormed()`無法檢出，只能以「含`U+FFFD`」作候選，再人工確認是否為被改寫之舊列(正常使用`U+FFFD`者同樣會被列出)：
+
+```alias
+let rs = await wo.select()
+let cand = rs.filter(r => typeof r.id === 'string' && r.id.includes('�'))
+
+//以良構之U+FFFD同形id清除候選舊列
+await wo.del(cand.map(r => ({ id: r.id })))
+
+//或依其他欄位條件清除，或以delAll()清空全表(審慎使用)
+```
+
+以孤立代理字元定址舊列(`del({ id: 'a\uD800' })`、`selectByPk('a\uD800')`)已被拒收，不會再命中以`U+FFFD`存放之他筆。
 
 ## Upgrading
 

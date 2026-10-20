@@ -77,13 +77,20 @@
     <dd class="tag-description"><ul class="dummy"><li><p>操作資料庫(MongoDB)</p>
 <p>本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。id為無業務語義之識別碼。
 opt.autoGenPk預設為true，insert、save與insertGfs於輸入未帶有效id時自動產生；del於任一設定下皆不補值。
-opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。</p></li></ul></dd>
+opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。</p>
+<p>字串良構檢核(w-orm系列一致，不隨opt.autoGenPk改變)：BSON會把孤立代理字元(String.prototype.isWellFormed()為false者)無聲改寫為U+FFFD，
+使不同id寫成同一id、鍵名撞鍵、寫入值與讀回值不同，故於到達MongoDB之前檢核並拒收：
+主鍵id不得為空字串或含孤立代理字元、NUL；寫入資料(insert、insertBulk、save)之字串值與鍵名(含巢狀物件與陣列元素)不得含孤立代理字元(值之NUL不檢查)；
+opt.url、opt.db、opt.cl含孤立代理字元者於建構時throw(訊息invalid opt.&lt;名&gt;: string contains lone surrogate)，建構時即取值，其後改動opt不影響本實例。
+insert、insertBulk、insertGfs整批reject且不寫入任何一筆；save、del、delGfs該筆ok為0並附err，同批其他筆照常；selectByPk、selectByPkGfs回傳null。
+錯誤訊息為固定詞彙、不回顯值，如invalid id: string contains lone surrogate at [data[1].id]、invalid data: string contains lone surrogate at [data[1].meta.tags[0]]。
+詳見README之字串良構檢核。</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line40">line 40</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line50">line 50</a>
     </li></ul></dd>
     
 
@@ -467,14 +474,15 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>刪除數據
-註: n為id命中筆數；未帶有效id者視為本筆無法處理，不送查詢條件且以ok為0並附err回報；
+註: n為id命中筆數；未帶有效id(非字串、空字串、含NUL或孤立代理字元)者視為本筆無法處理，不送查詢條件且以ok為0、n為0並附err(invalid id: 原因 at [data[k].id]，不回顯值)回報，
+每筆一次error事件，同批其他筆照常，同批皆不合格時不連線；
 判斷本筆是否真的被刪除一律以nDeleted為準</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1000">line 1000</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1168">line 1168</a>
     </li></ul></dd>
     
 
@@ -653,7 +661,7 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1145">line 1145</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1340">line 1340</a>
     </li></ul></dd>
     
 
@@ -847,7 +855,7 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1632">line 1632</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1873">line 1873</a>
     </li></ul></dd>
     
 
@@ -1020,15 +1028,14 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，刪除數據
-註: n為id命中筆數；未帶有效id者視為本筆無法處理，以ok為0並附err回報；
-id含NUL或孤立代理字元者不符系列條件白名單，尚未查找即以ok為0、n為0並附err(invalid find: ...)回報，不影響同批其他筆；
+註: n為id命中筆數；未帶有效id(非字串、空字串、含NUL或孤立代理字元)者視為本筆無法處理，尚未查找即以ok為0、n為0並附err(invalid id: ...，不回顯值)回報，不影響同批其他筆；
 判斷本筆是否真的被刪除一律以nDeleted為準</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1471">line 1471</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1688">line 1688</a>
     </li></ul></dd>
     
 
@@ -1188,13 +1195,15 @@ id含NUL或孤立代理字元者不符系列條件白名單，尚未查找即以
 註: 預設回傳單一聚合物件，n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
 註: option.returnList為true時改回與輸入等長且保序之逐筆陣列，供呼叫端得知[是哪幾筆]為新數據，
 聚合計數僅能回答[有幾筆]，而去重類呼叫端須知何者為新方能對其執行下游動作
-註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
+註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，
+訊息為invalid id: 原因 at [data[k].id]或invalid data: 原因 at [data[k].路徑]，以索引最小之不合格筆為準，不回顯值，error事件於reject前發出一次</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line452">line 452</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line563">line 563</a>
     </li></ul></dd>
     
 
@@ -1481,6 +1490,7 @@ id含NUL或孤立代理字元者不符系列條件白名單，尚未查找即以
 本函數則整批reject；需要逐筆處置者改用insert
 註: n為輸入筆數，nInserted於成功時恆等於n；不提供逐筆結果，故不出現ok為0與err
 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，訊息格式同insert
 註: 全有全無之達成方式依部署而異——具replica set或分片叢集者以交易包覆，
 standalone無交易可用而以補償動作達成，其限制詳見_insertBulkByCompensate</p></li></ul></dd>
     
@@ -1488,7 +1498,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line702">line 702</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line822">line 822</a>
     </li></ul></dd>
     
 
@@ -1646,13 +1656,15 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
 數據物件形狀為{ id, u8a }，u8a須為Uint8Array
 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
-註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
+註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+註: 主鍵id含孤立代理字元或NUL者於連線與寫入之前整批reject且同批皆不寫入(訊息invalid id: 原因 at [data[k].id]，不回顯值)；
+本函數僅寫入id(檔名)與u8a(位元組)，其餘欄位不寫入故不檢核</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1220">line 1220</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1417">line 1417</a>
     </li></ul></dd>
     
 
@@ -1810,13 +1822,15 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     <dd class="tag-description"><ul class="dummy"><li><p>儲存數據，以id為準更新既有數據，未給之欄位會保留；id不存在且option.autoInsert為true時改為插入
 註: n為id命中筆數，命中或經插入而產生皆為1；[內容相同]之判定基準為將待儲存物件合併進現值後結果與現值相同，
 相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報
-註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入</p></li></ul></dd>
+註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，該筆以ok為0並附err(invalid id: …或invalid data: …，不回顯值)回報，
+不送往伺服器，每筆一次error事件，同批其他筆照常；同批皆不合格時不連線</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line920">line 920</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1064">line 1064</a>
     </li></ul></dd>
     
 
@@ -2110,7 +2124,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line316">line 316</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line416">line 416</a>
     </li></ul></dd>
     
 
@@ -2284,13 +2298,14 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>由主鍵查詢單筆數據，因由MongoDB查找且僅回傳單筆，不需如select提取全部符合數據再處理，故數據量大時效能較佳
 註: 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定
-註: 本函數不得有副作用，故不建立唯一索引</p></li></ul></dd>
+註: 本函數不得有副作用，故不建立唯一索引
+註: 主鍵值含NUL或孤立代理字元者視為無效(BSON會把孤立代理字元改寫為U+FFFD而命中他筆)，不連線並回傳null</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line384">line 384</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line485">line 485</a>
     </li></ul></dd>
     
 
@@ -2443,7 +2458,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>使用GridFS，由主鍵查詢單筆數據
-註: 查無數據或主鍵值無效時回傳null，判定基準與selectByPk一致
+註: 查無數據或主鍵值無效(非字串、空字串、含NUL或孤立代理字元)時回傳null，不連線，判定基準與selectByPk一致
 註: 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定
 本函數不得有副作用，故不建立唯一索引</p></li></ul></dd>
     
@@ -2451,7 +2466,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1330">line 1330</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1540">line 1540</a>
     </li></ul></dd>
     
 
@@ -2608,7 +2623,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Tue Oct 20 2026 01:59:19 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 21 2026 00:27:11 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

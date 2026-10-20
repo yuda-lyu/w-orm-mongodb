@@ -445,35 +445,42 @@ describe('find whitelist gfs: bad find does not reach mongodb', function() {
 describe('find whitelist gfs: delGfs with id out of whitelist', function() {
     let cl = 'gfsnul'
 
-    it('should get n 0 and ok 0 with invalid find for delGfs of ids out of whitelist, other ids not affected', async function() {
+    it('should get n 0 and ok 0 with invalid id for delGfs of ids out of whitelist, other ids not affected', async function() {
         this.timeout(180000)
         let wo = WOrm(genOpt(cl))
         let evs = collect(wo)
         await reseed(cl, wo)
         let idNul = 'x\u0000y'
-        let r0 = await wo.insertGfs({ id: idNul, u8a: genU8a(5) })
-        assert.strict.deepStrictEqual(r0.nInserted, 1)
+
+        //含NUL之檔名(舊版可由insertGfs寫入, 第66項起insertGfs拒收主鍵含NUL, 故以驅動直接寫入舊列)
+        await new Promise((resolve, reject) => {
+            let up = new mongodb.GridFSBucket(rawClient.db(ctDb), { bucketName: cl }).openUploadStream(idNul)
+            up.on('error', reject)
+            up.on('finish', resolve)
+            up.end(Buffer.from(genU8a(5)))
+        })
+        assert.strict.deepStrictEqual((await listNames(cl)).includes(idNul), true)
         evs.length = 0
 
-        //delGfs, 條件未通過白名單檢核(id含NUL或孤立代理字元)者尚未查找, n為0、ok為0, 逐筆失敗不中斷同批其他筆, 不論該id是否存在
-        let msgNul = 'invalid find: string contains NUL at [find.filename]'
-        let msgLone = 'invalid find: string contains lone surrogate at [find.filename]'
+        //delGfs, 主鍵含NUL或孤立代理字元者(第66項起由主鍵檢核拒收, 訊息為invalid id: …且不回顯值)尚未查找, n為0、ok為0, 逐筆失敗不中斷同批其他筆, 不論該id是否存在
+        let msgNul = (k) => `invalid id: string contains NUL at [data[${k}].id]`
+        let msgLone = (k) => `invalid id: string contains lone surrogate at [data[${k}].id]`
         let r = await wo.delGfs([{ id: idNul }, { id: 'absent\u0000id' }, { id: '\uD800' }, { id: 'ok\uDC00' }, { id: 'g1' }])
         assert.strict.deepStrictEqual(r, [
-            { n: 0, nDeleted: 0, ok: 0, err: msgNul },
-            { n: 0, nDeleted: 0, ok: 0, err: msgNul },
-            { n: 0, nDeleted: 0, ok: 0, err: msgLone },
-            { n: 0, nDeleted: 0, ok: 0, err: msgLone },
+            { n: 0, nDeleted: 0, ok: 0, err: msgNul(0) },
+            { n: 0, nDeleted: 0, ok: 0, err: msgNul(1) },
+            { n: 0, nDeleted: 0, ok: 0, err: msgLone(2) },
+            { n: 0, nDeleted: 0, ok: 0, err: msgLone(3) },
             { n: 1, nDeleted: 1, ok: 1 },
         ])
 
         //每個失敗筆各發出一次error, 整批一次change
         assert.strict.deepStrictEqual(nType(evs, 'error'), 4)
         assert.strict.deepStrictEqual(evs.filter((v) => v.type === 'error').map((v) => [v.mode, v.err]), [
-            ['delGfs', msgNul],
-            ['delGfs', msgNul],
-            ['delGfs', msgLone],
-            ['delGfs', msgLone],
+            ['delGfs', msgNul(0)],
+            ['delGfs', msgNul(1)],
+            ['delGfs', msgLone(2)],
+            ['delGfs', msgLone(3)],
         ])
         assert.strict.deepStrictEqual(nType(evs, 'change'), 1)
         assert.strict.deepStrictEqual(await listNames(cl), ['g2', 'g3', 'g4', 'g5', 'g6', idNul].sort())

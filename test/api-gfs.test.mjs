@@ -227,7 +227,7 @@ describe('gfs basic', function() {
         vget[11] = await wo.delGfs({ id: 'id-not-existed' })
 
         //delGfs未帶有效id, 須以ok為0回報
-        // vans[12] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+        // vans[12] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[0].id]' }]
         vget[12] = await wo.delGfs({ u8a: genU8a(10) })
 
         //delGfs輸入無效視為空結果
@@ -236,7 +236,7 @@ describe('gfs basic', function() {
 
         //delGfs混合有效與無效id, 須逐筆回報且長度與輸入相同
         await wo.insertGfs({ id: 'g-mix', u8a: genU8a(100, 2) })
-        // vans[14] = [{ n: 1, nDeleted: 1, ok: 1 }, { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+        // vans[14] = [{ n: 1, nDeleted: 1, ok: 1 }, { n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[1].id]' }]
         vget[14] = await wo.delGfs([{ id: 'g-mix' }, { u8a: genU8a(10) }])
 
         //鍵集合須固定
@@ -333,7 +333,7 @@ describe('gfs basic', function() {
         assert.strict.deepStrictEqual(vget[11], vans[11])
     })
 
-    vans[12] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+    vans[12] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[0].id]' }]
     it(`should get ${JSON.stringify(vans[12])} for delGfs without valid id`, async function() {
         assert.strict.deepStrictEqual(vget[12], vans[12])
     })
@@ -345,7 +345,7 @@ describe('gfs basic', function() {
 
     vans[14] = [
         { n: 1, nDeleted: 1, ok: 1 },
-        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }
+        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[1].id]' }
     ]
     it(`should get ${JSON.stringify(vans[14])} for delGfs with mixed valid and invalid id`, async function() {
         assert.strict.deepStrictEqual(vget[14], vans[14])
@@ -647,7 +647,7 @@ describe('gfs autoGenPk', function() {
         assert.strict.deepStrictEqual(vget[8], vans[8])
     })
 
-    vans[9] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }]
+    vans[9] = [{ n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[0].id]' }]
     it(`should get ${JSON.stringify(vans[9])} for delGfs without id by autoGenPk=false`, async function() {
         assert.strict.deepStrictEqual(vget[9], vans[9])
     })
@@ -758,7 +758,7 @@ describe('gfs error event', function() {
 
     vans[8] = [
         { n: 1, nDeleted: 1, ok: 1 },
-        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id[undefined]' }
+        { n: 0, nDeleted: 0, ok: 0, err: 'invalid id: not a string at [data[1].id]' }
     ]
     it(`should get ${JSON.stringify(vans[8])} for result with throwing error listener`, async function() {
         assert.strict.deepStrictEqual(vget[8], vans[8])
