@@ -84,13 +84,19 @@ opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋�
 opt.url、opt.db、opt.cl含孤立代理字元者於建構時throw(訊息invalid opt.&lt;名&gt;: string contains lone surrogate)，建構時即取值，其後改動opt不影響本實例。
 insert、insertBulk、insertGfs整批reject且不寫入任何一筆；save、del、delGfs該筆ok為0並附err，同批其他筆照常；selectByPk、selectByPkGfs回傳null。
 錯誤訊息為固定詞彙、不回顯值，如invalid id: string contains lone surrogate at [data[1].id]、invalid data: string contains lone surrogate at [data[1].meta.tags[0]]。
-詳見README之字串良構檢核。</p></li></ul></dd>
+詳見README之字串良構檢核。</p>
+<p>診斷輸出(R-DIAG-01)：本套件唯一會自行輸出者，為change與error事件之訂閱函數拋錯時(該錯誤不影響操作結果，故僅吞下並輸出)。所有輸出皆經單一出口(src/getDiag.mjs)，
+預設只輸出固定標籤與不含個資之摘要(操作別、錯誤類別與機器代碼)，不輸出訂閱函數所拋錯誤之訊息、堆疊與其中的資料值、id等。
+opt.logDetail為true時還原舊版輸出(裸輸出訂閱函數所拋之錯誤)，opt.funLog為函數時改交給它(label, safe, detail)、不寫console；
+兩者之細節中，連線字串與帳密(opt.url內之帳號、密碼、查詢參數中名稱含pass/pwd/secret/token/credential/user者之值)一律以<em><strong>取代。
+連線字串無法被驅動解析時(如缺少@主機而被當成host:port)，驅動所拋錯誤之訊息、堆疊與cause可能回顯帳密，本套件於拋出前將其以</strong></em>取代(錯誤類別與訊息前綴不變)。
+各操作之resolve、reject內容與事件payload不受診斷輸出影響。詳見README之Diagnostic output。</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line50">line 50</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line60">line 60</a>
     </li></ul></dd>
     
 
@@ -386,6 +392,84 @@ insert、insertBulk、insertGfs整批reject且不寫入任何一筆；save、del
         </tr>
 
     
+
+        <tr>
+            
+                <td class="name"><code>logDetail</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入是否還原舊版之詳細console輸出，預設false。僅true生效(其他值忽略並用預設，同opt.autoGenPk)；true時change與error訂閱函數拋錯會裸輸出該錯誤(含訊息與堆疊，連線憑證仍以***取代)，可能含資料值與id，僅供除錯</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>funLog</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入診斷輸出函數(label, safe, detail)，預設無。僅函數生效(其他值忽略)；給予時診斷輸出只交給它、不寫console，label為固定標籤，safe為不含個資之摘要，detail為完整細節之遮罩拷貝(連線憑證以***取代，不改動原物件)，供使用端自行遮罩或轉送；其拋錯與回傳之promise之reject皆被吞下，不影響操作</p></td>
+        </tr>
+
+    
     </tbody>
 </table>
 
@@ -482,7 +566,7 @@ insert、insertBulk、insertGfs整批reject且不寫入任何一筆；save、del
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1168">line 1168</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1204">line 1204</a>
     </li></ul></dd>
     
 
@@ -661,7 +745,7 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1340">line 1340</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1376">line 1376</a>
     </li></ul></dd>
     
 
@@ -855,7 +939,7 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1873">line 1873</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1909">line 1909</a>
     </li></ul></dd>
     
 
@@ -1035,7 +1119,7 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1688">line 1688</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1724">line 1724</a>
     </li></ul></dd>
     
 
@@ -1203,7 +1287,7 @@ null僅可用於欄位等值、$eq、$ne。白名單外之運算子($not $nor $r
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line563">line 563</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line599">line 599</a>
     </li></ul></dd>
     
 
@@ -1498,7 +1582,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line822">line 822</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line858">line 858</a>
     </li></ul></dd>
     
 
@@ -1664,7 +1748,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1417">line 1417</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1453">line 1453</a>
     </li></ul></dd>
     
 
@@ -1830,7 +1914,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1064">line 1064</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1100">line 1100</a>
     </li></ul></dd>
     
 
@@ -2124,7 +2208,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line416">line 416</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line452">line 452</a>
     </li></ul></dd>
     
 
@@ -2305,7 +2389,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line485">line 485</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line521">line 521</a>
     </li></ul></dd>
     
 
@@ -2466,7 +2550,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1540">line 1540</a>
+        <a href="WOrmMongodb.mjs.html">WOrmMongodb.mjs</a>, <a href="WOrmMongodb.mjs.html#line1576">line 1576</a>
     </li></ul></dd>
     
 
@@ -2623,7 +2707,7 @@ standalone無交易可用而以補償動作達成，其限制詳見_insertBulkBy
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Oct 25 2026 23:36:49 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 28 2026 10:28:32 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
