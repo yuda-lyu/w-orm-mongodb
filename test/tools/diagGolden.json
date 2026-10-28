@@ -1,0 +1,2796 @@
+{
+  "online_ok": {
+    "out": [
+      {
+        "ok": {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      },
+      {
+        "err": "E11000 duplicate key error collection: worm.diag index: id_1 dup key: { id: \"a1\" }"
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 1,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 1,
+            "nModified": 0,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      },
+      {
+        "ok": [
+          {
+            "id": "a1",
+            "name": "n1x",
+            "value": 1
+          }
+        ]
+      },
+      {
+        "ok": [
+          {
+            "id": "a1",
+            "name": "n1x",
+            "value": 1
+          },
+          {
+            "id": "a2",
+            "name": "n2",
+            "value": 2
+          },
+          {
+            "id": "b1",
+            "name": "bk1"
+          },
+          {
+            "id": "b2",
+            "name": "bk2"
+          },
+          {
+            "id": "c1",
+            "name": "ok"
+          },
+          {
+            "id": "GENID",
+            "name": "empty id"
+          },
+          {
+            "id": "a3",
+            "name": "n3"
+          }
+        ]
+      },
+      {
+        "ok": {
+          "id": "a2",
+          "name": "n2",
+          "value": 2
+        }
+      },
+      {
+        "ok": null
+      },
+      {
+        "err": "invalid find: unsupported operator [$foo] at [find.$foo]"
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains NUL at [data[1].id]"
+          }
+        ]
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          }
+        ]
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      },
+      {
+        "err": "invalid find: unsupported operator [$foo] at [find.$foo]"
+      },
+      {
+        "ok": {
+          "n": 4,
+          "nDeleted": 4,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      },
+      {
+        "err": "invalid data[0].u8a"
+      },
+      {
+        "ok": {
+          "id": "f1",
+          "u8a": {
+            "0": 1,
+            "1": 2,
+            "2": 3
+          }
+        }
+      },
+      {
+        "ok": null
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      },
+      {
+        "err": "invalid find: unsupported operator [$foo] at [find.$foo]"
+      },
+      {
+        "ok": {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      }
+    ],
+    "evs": [
+      [
+        "change",
+        "delAll",
+        null,
+        {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "a1",
+            "name": "n1",
+            "value": 1,
+            "_id": "OID"
+          },
+          {
+            "id": "a2",
+            "name": "n2",
+            "value": 2,
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "a1",
+            "name": "dup",
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "insertBulk",
+        [
+          {
+            "id": "a1",
+            "name": "dup",
+            "_id": "OID"
+          }
+        ],
+        "E11000 duplicate key error collection: worm.diag index: id_1 dup key: { id: \"a1\" }"
+      ],
+      [
+        "change",
+        "insertBulk",
+        [
+          {
+            "id": "b1",
+            "name": "bk1",
+            "_id": "OID"
+          },
+          {
+            "id": "b2",
+            "name": "bk2",
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "c1",
+            "name": "ok",
+            "_id": "OID"
+          },
+          {
+            "id": "GENID",
+            "name": "empty id",
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "a3",
+            "name": "n3"
+          }
+        ],
+        {
+          "n": 1,
+          "nInserted": 1,
+          "nModified": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "save",
+        [
+          {
+            "id": "x\ud800",
+            "name": "bad id"
+          }
+        ],
+        "invalid id: string contains lone surrogate at [data[2].id]"
+      ],
+      [
+        "change",
+        "save",
+        [
+          {
+            "id": "a1",
+            "name": "n1x"
+          },
+          {
+            "id": "a3",
+            "name": "n3"
+          },
+          {
+            "id": "x\ud800",
+            "name": "bad id"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 1,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 1,
+            "nModified": 0,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      ],
+      [
+        "error",
+        "select",
+        null,
+        "invalid find: unsupported operator [$foo] at [find.$foo]"
+      ],
+      [
+        "error",
+        "del",
+        [
+          {
+            "id": "y\u0000"
+          }
+        ],
+        "invalid id: string contains NUL at [data[1].id]"
+      ],
+      [
+        "change",
+        "del",
+        [
+          {
+            "id": "a2"
+          },
+          {
+            "id": "y\u0000"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains NUL at [data[1].id]"
+          }
+        ]
+      ],
+      [
+        "change",
+        "del",
+        [
+          {
+            "id": "a3"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          }
+        ]
+      ],
+      [
+        "change",
+        "delAll",
+        null,
+        {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "delAll",
+        null,
+        "invalid find: unsupported operator [$foo] at [find.$foo]"
+      ],
+      [
+        "change",
+        "delAll",
+        null,
+        {
+          "n": 4,
+          "nDeleted": 4,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insertGfs",
+        [
+          {
+            "id": "f1",
+            "u8a": {
+              "0": 1,
+              "1": 2,
+              "2": 3
+            }
+          },
+          {
+            "id": "f2",
+            "u8a": {
+              "0": 4,
+              "1": 5
+            }
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insertGfs",
+        [
+          {
+            "id": "f1",
+            "u8a": {
+              "0": 9
+            }
+          }
+        ],
+        {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "insertGfs",
+        [
+          {
+            "id": "f3"
+          }
+        ],
+        "invalid data[0].u8a"
+      ],
+      [
+        "error",
+        "delGfs",
+        [
+          {
+            "id": "z\ud800"
+          }
+        ],
+        "invalid id: string contains lone surrogate at [data[2].id]"
+      ],
+      [
+        "change",
+        "delGfs",
+        [
+          {
+            "id": "f1"
+          },
+          {
+            "id": "nope"
+          },
+          {
+            "id": "z\ud800"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      ],
+      [
+        "change",
+        "delAllGfs",
+        null,
+        {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "delAllGfs",
+        null,
+        "invalid find: unsupported operator [$foo] at [find.$foo]"
+      ],
+      [
+        "change",
+        "delAllGfs",
+        null,
+        {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      ]
+    ]
+  },
+  "offline_ok": [
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "select",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "select",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "selectByPk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPk",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "insert",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insert",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "insertBulk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertBulk",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "save",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "del",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "delAll",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAll",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "selectByPkGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPkGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "insertGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertGfs",
+          [
+            {
+              "id": "a1",
+              "u8a": {
+                "0": 1
+              }
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "delGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "delAllGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAllGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "select",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "select",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "selectByPk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPk",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "insert",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insert",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "insertBulk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertBulk",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "save",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "del",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "delAll",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAll",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "selectByPkGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPkGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "insertGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertGfs",
+          [
+            {
+              "id": "a1",
+              "u8a": {
+                "0": 1
+              }
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "delGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "delAllGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAllGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "select",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "select",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "selectByPk",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPk",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "insert",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "insert",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "insertBulk",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "insertBulk",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "save",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "del",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "delAll",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "delAll",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "selectByPkGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPkGfs",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "insertGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "insertGfs",
+          [
+            {
+              "id": "a1",
+              "u8a": {
+                "0": 1
+              }
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "delGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "delAllGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "delAllGfs",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "name": "allBadIds",
+      "r": [
+        {
+          "ok": [
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[0].id]"
+            },
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        },
+        {
+          "ok": [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[1].id]"
+            }
+          ]
+        },
+        {
+          "ok": [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        }
+      ],
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "w\u0000"
+            }
+          ],
+          "invalid id: string contains NUL at [data[0].id]"
+        ],
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "x\ud800"
+            }
+          ],
+          "invalid id: string contains lone surrogate at [data[1].id]"
+        ],
+        [
+          "change",
+          "save",
+          [
+            {
+              "id": "w\u0000"
+            },
+            {
+              "id": "x\ud800"
+            }
+          ],
+          [
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[0].id]"
+            },
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        ],
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": ""
+            }
+          ],
+          "invalid id: string is empty at [data[0].id]"
+        ],
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "x\u0000"
+            }
+          ],
+          "invalid id: string contains NUL at [data[1].id]"
+        ],
+        [
+          "change",
+          "del",
+          [
+            {
+              "id": ""
+            },
+            {
+              "id": "x\u0000"
+            }
+          ],
+          [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[1].id]"
+            }
+          ]
+        ],
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": ""
+            }
+          ],
+          "invalid id: string is empty at [data[0].id]"
+        ],
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "x\ud800"
+            }
+          ],
+          "invalid id: string contains lone surrogate at [data[1].id]"
+        ],
+        [
+          "change",
+          "delGfs",
+          [
+            {
+              "id": ""
+            },
+            {
+              "id": "x\ud800"
+            }
+          ],
+          [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "ctor",
+      "ctors": [
+        "Error: invalid opt.url: string contains lone surrogate",
+        "Error: invalid opt.db: string contains lone surrogate",
+        "Error: invalid opt.cl: string contains lone surrogate"
+      ]
+    }
+  ],
+  "online_bad": {
+    "out": [
+      {
+        "ok": {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      },
+      {
+        "err": "E11000 duplicate key error collection: worm.diag index: id_1 dup key: { id: \"a1\" }"
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 1,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 1,
+            "nModified": 0,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      },
+      {
+        "ok": [
+          {
+            "id": "a1",
+            "name": "n1x",
+            "value": 1
+          }
+        ]
+      },
+      {
+        "ok": [
+          {
+            "id": "a1",
+            "name": "n1x",
+            "value": 1
+          },
+          {
+            "id": "a2",
+            "name": "n2",
+            "value": 2
+          },
+          {
+            "id": "b1",
+            "name": "bk1"
+          },
+          {
+            "id": "b2",
+            "name": "bk2"
+          },
+          {
+            "id": "c1",
+            "name": "ok"
+          },
+          {
+            "id": "GENID",
+            "name": "empty id"
+          },
+          {
+            "id": "a3",
+            "name": "n3"
+          }
+        ]
+      },
+      {
+        "ok": {
+          "id": "a2",
+          "name": "n2",
+          "value": 2
+        }
+      },
+      {
+        "ok": null
+      },
+      {
+        "err": "invalid find: unsupported operator [$foo] at [find.$foo]"
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains NUL at [data[1].id]"
+          }
+        ]
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          }
+        ]
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      },
+      {
+        "err": "invalid find: unsupported operator [$foo] at [find.$foo]"
+      },
+      {
+        "ok": {
+          "n": 4,
+          "nDeleted": 4,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      },
+      {
+        "err": "invalid data[0].u8a"
+      },
+      {
+        "ok": {
+          "id": "f1",
+          "u8a": {
+            "0": 1,
+            "1": 2,
+            "2": 3
+          }
+        }
+      },
+      {
+        "ok": null
+      },
+      {
+        "ok": [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      },
+      {
+        "ok": {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      },
+      {
+        "err": "invalid find: unsupported operator [$foo] at [find.$foo]"
+      },
+      {
+        "ok": {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      }
+    ],
+    "evs": [
+      [
+        "change",
+        "delAll",
+        null,
+        {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "a1",
+            "name": "n1",
+            "value": 1,
+            "_id": "OID"
+          },
+          {
+            "id": "a2",
+            "name": "n2",
+            "value": 2,
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "a1",
+            "name": "dup",
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "insertBulk",
+        [
+          {
+            "id": "a1",
+            "name": "dup",
+            "_id": "OID"
+          }
+        ],
+        "E11000 duplicate key error collection: worm.diag index: id_1 dup key: { id: \"a1\" }"
+      ],
+      [
+        "change",
+        "insertBulk",
+        [
+          {
+            "id": "b1",
+            "name": "bk1",
+            "_id": "OID"
+          },
+          {
+            "id": "b2",
+            "name": "bk2",
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "c1",
+            "name": "ok",
+            "_id": "OID"
+          },
+          {
+            "id": "GENID",
+            "name": "empty id",
+            "_id": "OID"
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insert",
+        [
+          {
+            "id": "a3",
+            "name": "n3"
+          }
+        ],
+        {
+          "n": 1,
+          "nInserted": 1,
+          "nModified": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "save",
+        [
+          {
+            "id": "x\ud800",
+            "name": "bad id"
+          }
+        ],
+        "invalid id: string contains lone surrogate at [data[2].id]"
+      ],
+      [
+        "change",
+        "save",
+        [
+          {
+            "id": "a1",
+            "name": "n1x"
+          },
+          {
+            "id": "a3",
+            "name": "n3"
+          },
+          {
+            "id": "x\ud800",
+            "name": "bad id"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 1,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 1,
+            "nModified": 0,
+            "ok": 1
+          },
+          {
+            "n": 1,
+            "nInserted": 0,
+            "nModified": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      ],
+      [
+        "error",
+        "select",
+        null,
+        "invalid find: unsupported operator [$foo] at [find.$foo]"
+      ],
+      [
+        "error",
+        "del",
+        [
+          {
+            "id": "y\u0000"
+          }
+        ],
+        "invalid id: string contains NUL at [data[1].id]"
+      ],
+      [
+        "change",
+        "del",
+        [
+          {
+            "id": "a2"
+          },
+          {
+            "id": "y\u0000"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains NUL at [data[1].id]"
+          }
+        ]
+      ],
+      [
+        "change",
+        "del",
+        [
+          {
+            "id": "a3"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          }
+        ]
+      ],
+      [
+        "change",
+        "delAll",
+        null,
+        {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "delAll",
+        null,
+        "invalid find: unsupported operator [$foo] at [find.$foo]"
+      ],
+      [
+        "change",
+        "delAll",
+        null,
+        {
+          "n": 4,
+          "nDeleted": 4,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insertGfs",
+        [
+          {
+            "id": "f1",
+            "u8a": {
+              "0": 1,
+              "1": 2,
+              "2": 3
+            }
+          },
+          {
+            "id": "f2",
+            "u8a": {
+              "0": 4,
+              "1": 5
+            }
+          }
+        ],
+        {
+          "n": 2,
+          "nInserted": 2,
+          "ok": 1
+        }
+      ],
+      [
+        "change",
+        "insertGfs",
+        [
+          {
+            "id": "f1",
+            "u8a": {
+              "0": 9
+            }
+          }
+        ],
+        {
+          "n": 1,
+          "nInserted": 0,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "insertGfs",
+        [
+          {
+            "id": "f3"
+          }
+        ],
+        "invalid data[0].u8a"
+      ],
+      [
+        "error",
+        "delGfs",
+        [
+          {
+            "id": "z\ud800"
+          }
+        ],
+        "invalid id: string contains lone surrogate at [data[2].id]"
+      ],
+      [
+        "change",
+        "delGfs",
+        [
+          {
+            "id": "f1"
+          },
+          {
+            "id": "nope"
+          },
+          {
+            "id": "z\ud800"
+          }
+        ],
+        [
+          {
+            "n": 1,
+            "nDeleted": 1,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 1
+          },
+          {
+            "n": 0,
+            "nDeleted": 0,
+            "ok": 0,
+            "err": "invalid id: string contains lone surrogate at [data[2].id]"
+          }
+        ]
+      ],
+      [
+        "change",
+        "delAllGfs",
+        null,
+        {
+          "n": 1,
+          "nDeleted": 1,
+          "ok": 1
+        }
+      ],
+      [
+        "error",
+        "delAllGfs",
+        null,
+        "invalid find: unsupported operator [$foo] at [find.$foo]"
+      ],
+      [
+        "change",
+        "delAllGfs",
+        null,
+        {
+          "n": 0,
+          "nDeleted": 0,
+          "ok": 1
+        }
+      ]
+    ]
+  },
+  "offline_bad": [
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "select",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "select",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "selectByPk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPk",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "insert",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insert",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "insertBulk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertBulk",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "save",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "del",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "delAll",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAll",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "selectByPkGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPkGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "insertGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertGfs",
+          [
+            {
+              "id": "a1",
+              "u8a": {
+                "0": 1
+              }
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "delGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "http://127.0.0.1:27017",
+      "name": "delAllGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAllGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "select",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "select",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "selectByPk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPk",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "insert",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insert",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "insertBulk",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertBulk",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "save",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "del",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "delAll",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAll",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "selectByPkGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPkGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "insertGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "insertGfs",
+          [
+            {
+              "id": "a1",
+              "u8a": {
+                "0": 1
+              }
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "delGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "not a url",
+      "name": "delAllGfs",
+      "r": {
+        "err": "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+      },
+      "evs": [
+        [
+          "error",
+          "delAllGfs",
+          null,
+          "Invalid scheme, expected connection string to start with \"mongodb://\" or \"mongodb+srv://\""
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "select",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "select",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "selectByPk",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPk",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "insert",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "insert",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "insertBulk",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "insertBulk",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "save",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "a1",
+              "name": "n"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "del",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "delAll",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "delAll",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "selectByPkGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "selectByPkGfs",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "insertGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "insertGfs",
+          [
+            {
+              "id": "a1",
+              "u8a": {
+                "0": 1
+              }
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "delGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "a1"
+            }
+          ],
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "url": "mongodb://",
+      "name": "delAllGfs",
+      "r": {
+        "err": "Protocol and host list are required in the uri"
+      },
+      "evs": [
+        [
+          "error",
+          "delAllGfs",
+          null,
+          "Protocol and host list are required in the uri"
+        ]
+      ]
+    },
+    {
+      "name": "allBadIds",
+      "r": [
+        {
+          "ok": [
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[0].id]"
+            },
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        },
+        {
+          "ok": [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[1].id]"
+            }
+          ]
+        },
+        {
+          "ok": [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        }
+      ],
+      "evs": [
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "w\u0000"
+            }
+          ],
+          "invalid id: string contains NUL at [data[0].id]"
+        ],
+        [
+          "error",
+          "save",
+          [
+            {
+              "id": "x\ud800"
+            }
+          ],
+          "invalid id: string contains lone surrogate at [data[1].id]"
+        ],
+        [
+          "change",
+          "save",
+          [
+            {
+              "id": "w\u0000"
+            },
+            {
+              "id": "x\ud800"
+            }
+          ],
+          [
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[0].id]"
+            },
+            {
+              "n": 1,
+              "nInserted": 0,
+              "nModified": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        ],
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": ""
+            }
+          ],
+          "invalid id: string is empty at [data[0].id]"
+        ],
+        [
+          "error",
+          "del",
+          [
+            {
+              "id": "x\u0000"
+            }
+          ],
+          "invalid id: string contains NUL at [data[1].id]"
+        ],
+        [
+          "change",
+          "del",
+          [
+            {
+              "id": ""
+            },
+            {
+              "id": "x\u0000"
+            }
+          ],
+          [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains NUL at [data[1].id]"
+            }
+          ]
+        ],
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": ""
+            }
+          ],
+          "invalid id: string is empty at [data[0].id]"
+        ],
+        [
+          "error",
+          "delGfs",
+          [
+            {
+              "id": "x\ud800"
+            }
+          ],
+          "invalid id: string contains lone surrogate at [data[1].id]"
+        ],
+        [
+          "change",
+          "delGfs",
+          [
+            {
+              "id": ""
+            },
+            {
+              "id": "x\ud800"
+            }
+          ],
+          [
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string is empty at [data[0].id]"
+            },
+            {
+              "n": 0,
+              "nDeleted": 0,
+              "ok": 0,
+              "err": "invalid id: string contains lone surrogate at [data[1].id]"
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "ctor",
+      "ctors": [
+        "Error: invalid opt.url: string contains lone surrogate",
+        "Error: invalid opt.db: string contains lone surrogate",
+        "Error: invalid opt.cl: string contains lone surrogate"
+      ]
+    }
+  ]
+}

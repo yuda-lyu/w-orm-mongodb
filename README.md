@@ -48,6 +48,47 @@ MongoDB的BSON會把孤立代理字元(UTF-16代理對被拆開後只剩一半�
 
 未變：`{}`、未給、`undefined`皆代表全部；白名單內之條件，命中集合不變(MongoDB式語意)；`select`回傳仍不含`_id`。需要被移除之功能者(如模糊比對)，請改為`select`後於記憶體過濾。
 
+### 診斷輸出(`opt.logDetail`、`opt.funLog`，`w-orm-*`系列一致)
+
+本套件自行輸出的只有一種情形：`change`或`error`事件的訂閱函數拋錯(該錯誤不影響操作結果，故僅被吞下並輸出)。所有輸出皆經**單一出口**(`src/getDiag.mjs`)。服務的console常被收進日誌系統，訂閱函數所拋錯誤的訊息可能帶有主鍵(下游系統中可能是使用者識別或電子郵件)、資料值或連線字串，不應預設落入日誌，故本版起**預設只輸出固定標籤與不含個資之摘要**。連線字串與帳密(`opt.url`整串、帳密段、單獨之密碼與帳號、URL編碼與解碼形式、查詢參數中名稱含`pass`/`pwd`/`secret`/`token`/`credential`/`user`者之值，如`tlsCertificateKeyFilePassword`、`proxyPassword`、`proxyUsername`與`authMechanismProperties`內的`AWS_SESSION_TOKEN`)於**任何輸出管道**(預設、`logDetail`、`funLog`)一律以`***`取代。
+
+| 選項 | 預設 | 說明 |
+|---|---|---|
+| `opt.logDetail` | `false` | 為`true`時還原舊版之細節輸出(裸輸出訂閱函數所拋之錯誤，與舊版的`console.log(err)`同格式)。可能含資料值與id，**僅供除錯**。非`true`之值一律忽略並用預設(型別錯誤處理同`opt.autoGenPk`)。 |
+| `opt.funLog` | 無 | 函數`(label, safe, detail)`。給予時診斷輸出**只**交給它、不寫console。`label`為固定標籤，`safe`為不含個資之摘要，`detail`為完整細節(無細節時不帶此引數)，其中連線憑證已以`***`取代，供使用端自行遮罩或轉送至自己的日誌。`detail`是**遮罩拷貝**且有大小上限：純物件(類別實例成為純物件，不保留原型)、陣列(含非索引鍵)、`Error`(含message、stack、`cause`與自有欄位)、`Date`會被複製，包裝字串(`new String`)取其字串值；深度超過6層者為`'[Truncated]'`，節點(含鍵)合計超過2000時其餘鍵不再複製並加上`'[Truncated]': true`標記鍵；函數、二進位資料、`Map`/`Set`、其他包裝物件、存取器以標記字串代替(`'[Function]'`、`'[Binary 12 bytes]'`、`'[Object]'`、`'[Getter/Setter]'`)；不會執行使用端的getter、自訂`inspect`與二進位資料上自行定義的`byteLength`(例外：使用端拋出的Proxy物件，本套件無法偵測Proxy，其trap可能被觸發，拋錯一律被吞下)。非函數之值忽略；`funLog`拋錯、回傳reject之promise(含覆寫了`then`的原生promise)，皆不影響操作。 |
+
+兩個選項皆於建構時取值，其後改動`opt`不影響已建立之實例。
+
+預設輸出：
+
+| 位置 | 舊版 | 現在 |
+|---|---|---|
+| `change`訂閱函數拋錯 | `console.log(err)`：整個錯誤，含訂閱函數自行放入訊息的任何內容 | `change handler threw { mode: 'insert', errType: 'Error' }`：操作別、錯誤類別，以及(有時)機器代碼(`ECONNREFUSED`類、`ERR_`開頭、不大於99999的整數) |
+| `error`訂閱函數拋錯 | `console.log(errEmit)` | `error handler threw { mode: 'select', errType: 'Error' }` |
+
+```alias
+// 正式環境: console上只有標籤與摘要
+let wo = WOrm({ url, db, cl })
+
+// 除錯: 還原舊版細節(連線憑證仍遮罩)
+let wd = WOrm({ url, db, cl, logDetail: true })
+
+// 轉送至自己的日誌，自行遮罩
+let wf = WOrm({
+    url, db, cl,
+    funLog: (label, safe, detail) => {
+        logger.info({ label, safe }) // safe不含個資
+        // detail含完整文字、鍵與值(僅連線憑證已遮罩)，離開行程前請自行遮罩
+    },
+})
+```
+
+**破壞性變更**：僅輸出內容改變——各函數 resolve／reject 之內容與時機、`change`與`error`事件之 payload 皆與舊版相同(有固定預期值測試逐一比對)。
+
+- 訂閱函數拋錯時，console上不再出現該錯誤的訊息、堆疊與其中的資料；需要者加`logDetail: true`或讀`funLog`。
+- **連線字串無法被驅動解析時**，驅動所拋錯誤的訊息、堆疊與`cause`可能回顯帳密(例：缺少`@主機`的`mongodb://帳號:密碼`會被當成`host:port`，訊息為`Unable to parse 帳號:密碼 with URL`，`cause.input`亦含該字串；`error`事件的 payload 與未捕獲時 Node 印到 stderr 的內容也是它)。本版起往外拋出前把憑證以`***`取代：**錯誤的類別(`MongoRuntimeError`、`MongoParseError`等)、原型與訊息前綴不變**，如`Unable to parse *** with URL`。規則：整串連線字串、帳密段(第一個`/`、`?`、`#`之前以最後一個`@`為界，並另以整串最後一個`@`為界再解析一次取聯集，故路徑或查詢字串含`@`時亦不漏)、密碼(4字元以上)、查詢參數中名稱含`pass`/`pwd`/`secret`/`token`/`credential`/`user`者之值(4字元以上)與`authMechanismProperties`內名稱含上列字樣之屬性值(如`AWS_SESSION_TOKEN`；`SERVICE_NAME`等一般設定值不遮)皆取代，並含各自的百分比解碼(寬鬆，不完整之編碼亦可)、URL編碼、空白換成`%20`、`+`視為空白與`;`分段等驅動可能回顯的形式；帳號段含驅動拒收的未編碼字元(`/ ? # [ ] @`)時驅動會回顯該帳號(`Username contains unescaped characters …`)，該帳號亦取代；`@`之後的主機位址項僅在合於「主機名稱或`[IPv6]`，可帶最多5位數字之port」時才保留(如`db.local:99999`)，其餘(如`host:abc`、`[::1`、反向書寫時落在`@`之後的`帳號:密碼`)取代；沒有`@`時(`host:port`會被驅動當成帳號:密碼之筆誤形態)主機位址項全部取代；另不依賴已知秘密，驅動回顯的`Unable to parse <主機位址> with URL`與其`cause.input`(`iLoveJS://<主機位址>`)中不合主機樣式者一律取代。`opt.url`為`String`包裝物件(驅動接受)時同字串處理。不含憑證的解析失敗(如`Invalid scheme, expected connection string to start with "mongodb://" or "mongodb+srv://"`)訊息與驅動原訊息完全相同。建構函式(`WOrm(opt)`)自身的錯誤訊息一向為固定詞彙(`invalid opt.url: string contains lone surrogate`)，不回顯連線字串。
+- 未涵蓋：①驅動執行期的連線錯誤(認證失敗、連不上)由驅動產生，實測其訊息只含位址(`connect ECONNREFUSED 127.0.0.1:27017`)或固定文字(`Authentication failed.`)，不含帳密，本套件不改動它；②MongoDB驅動自身的日誌(`MONGODB_LOG_*`環境變數或`mongodbLogPath`選項，預設關閉，開啟後驅動會輸出指令與資料)與`process.emitWarning`(如過時選項警告)不經本套件的出口，也不受`funLog`控制；③短於3字元的單獨帳號或密碼(如`mongodb://e@host`的`e`)不取代——取代會把標籤、錯誤訊息與路徑中的同字元一併吞掉(例如把操作別`select`變成`s***l***ct`)，其本身也無保密價值；連線設定錯誤的取代不含單獨之帳號(驅動只在帳號含未編碼字元時回顯，見上)，`logDetail`與`funLog`之細節中單獨的帳號在至少3字元時才取代；摘要中的操作別(`mode`)為本套件填入的固定詞彙，不經取代；④反向筆誤的`host:port@帳號:純數字且不超過5位的密碼`，`@`之後的`帳號:密碼`合於「主機:port」樣式而被視為主機位址保留。
+
 ## Documentation
 To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-orm-mongodb/WOrmMongodb.html).
 
@@ -404,7 +445,7 @@ wo.on('error', function(mode, data, err) {
 
 **操作行為不因監聽者之有無而改變。** 同一份程式碼、同一組輸入，於有註冊監聽與未註冊監聽兩種情況下，回傳值與 resolve／reject 之選擇完全相同。本套件之`EventEmitter`採`eventemitter3`（`wsemi`之`evem()`），其於`'error'`無監聽者時僅回傳`false`而不拋出；Node 內建之`events.EventEmitter`具「`'error'`無監聽者時將錯誤拋出」之語義，故不採用。
 
-訂閱函數自身拋錯亦不影響本次操作之結果——每一處`emit`皆以 try/catch 包覆。
+訂閱函數自身拋錯亦不影響本次操作之結果——每一處`emit`皆以 try/catch 包覆；該錯誤預設只輸出標籤與摘要，不輸出其訊息(見上方「診斷輸出」，`opt.logDetail`、`opt.funLog`)。
 
 **正常結果不發出`error`。** `insert`全數已存在、`save`合併後內容相同而未寫入、`del`主鍵未命中、`delAll`條件無命中、`selectByPk`查無數據，皆為正常結果而非錯誤。
 

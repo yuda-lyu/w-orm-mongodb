@@ -1,6 +1,6 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
     "mongodb": "^7.5.0",

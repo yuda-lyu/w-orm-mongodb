@@ -22,6 +22,7 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import isu8arr from 'wsemi/src/isu8arr.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
+import { getOptLog, getSecrets, maskErr, getDiag, getBriefErr } from './getDiag.mjs'
 
 
 /**
@@ -39,12 +40,21 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
  * 錯誤訊息為固定詞彙、不回顯值，如invalid id: string contains lone surrogate at [data[1].id]、invalid data: string contains lone surrogate at [data[1].meta.tags[0]]。
  * 詳見README之字串良構檢核。
  *
+ * 診斷輸出(R-DIAG-01)：本套件唯一會自行輸出者，為change與error事件之訂閱函數拋錯時(該錯誤不影響操作結果，故僅吞下並輸出)。所有輸出皆經單一出口(src/getDiag.mjs)，
+ * 預設只輸出固定標籤與不含個資之摘要(操作別、錯誤類別與機器代碼)，不輸出訂閱函數所拋錯誤之訊息、堆疊與其中的資料值、id等。
+ * opt.logDetail為true時還原舊版輸出(裸輸出訂閱函數所拋之錯誤)，opt.funLog為函數時改交給它(label, safe, detail)、不寫console；
+ * 兩者之細節中，連線字串與帳密(opt.url內之帳號、密碼、查詢參數中名稱含pass/pwd/secret/token/credential/user者之值)一律以***取代。
+ * 連線字串無法被驅動解析時(如缺少@主機而被當成host:port)，驅動所拋錯誤之訊息、堆疊與cause可能回顯帳密，本套件於拋出前將其以***取代(錯誤類別與訊息前綴不變)。
+ * 各操作之resolve、reject內容與事件payload不受診斷輸出影響。詳見README之Diagnostic output。
+ *
  * @class
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {String} [opt.url='mongodb://127.0.0.1:27017'] 輸入連接資料庫字串，預設'mongodb://127.0.0.1:27017'
  * @param {String} [opt.db='worm'] 輸入使用資料庫名稱字串，預設'worm'
  * @param {String} [opt.cl='test'] 輸入使用資料表名稱字串，預設'test'
  * @param {Boolean} [opt.autoGenPk=true] 輸入是否於輸入未帶有效主鍵時自動產生主鍵值，預設true。為false時主鍵須由呼叫端自備，屬依賴注入之定位，主鍵之唯一性、格式與是否與既有資料衝突皆由呼叫端自負。本設定為建構層設定，不得於insert與save之option逐次覆寫
+ * @param {Boolean} [opt.logDetail=false] 輸入是否還原舊版之詳細console輸出，預設false。僅true生效(其他值忽略並用預設，同opt.autoGenPk)；true時change與error訂閱函數拋錯會裸輸出該錯誤(含訊息與堆疊，連線憑證仍以***取代)，可能含資料值與id，僅供除錯
+ * @param {Function} [opt.funLog] 輸入診斷輸出函數(label, safe, detail)，預設無。僅函數生效(其他值忽略)；給予時診斷輸出只交給它、不寫console，label為固定標籤，safe為不含個資之摘要，detail為完整細節之遮罩拷貝(連線憑證以***取代，不改動原物件)，供使用端自行遮罩或轉送；其拋錯與回傳之promise之reject皆被吞下，不影響操作
  * @returns {Object} 回傳操作資料庫物件，各事件功能詳見說明
  */
 function WOrmMongodb(opt = {}) {
@@ -84,6 +94,14 @@ function WOrmMongodb(opt = {}) {
     })
 
 
+    //diag, 診斷輸出之單一出口(R-DIAG-01), 本檔不得直接呼叫console; 建構時固定取得opt.logDetail與opt.funLog(其後改動opt不影響本實例), 連線憑證由url導出
+    let diag = getDiag(getOptLog(opt), getSecrets(url))
+
+
+    //secretsConn, 連線設定錯誤(驅動解析連線字串失敗)之遮罩用憑證清單
+    let secretsConn = getSecrets(url, true)
+
+
     //_indexReady, 唯一索引只須建立一次, 以旗標記錄避免每次操作皆多一次round-trip
     let _indexReady = false
 
@@ -103,6 +121,24 @@ function WOrmMongodb(opt = {}) {
 
     //MongoClient
     let MongoClient = mongodb.MongoClient
+
+
+    /**
+     * 建立MongoClient，連線字串無法解析時驅動所拋之錯誤可能回顯帳密(如缺少@主機之mongodb://帳號:密碼會被當成host:port，
+     * 訊息為Unable to parse 帳號:密碼 with URL，其cause的input亦含該字串)，故於往外拋之前將其中憑證以***取代
+     * 註: 原地遮罩，錯誤物件(類別、原型、訊息前綴)不變，各函數之catch、reject與error事件所收到者即為遮罩後之同一個錯誤物件
+     *
+     * @ignore
+     * @returns {Object} 回傳MongoClient物件
+     */
+    function genClient() {
+        try {
+            return new MongoClient(url)
+        }
+        catch (err) {
+            throw maskErr(err, secretsConn)
+        }
+    }
 
 
     /**
@@ -138,7 +174,7 @@ function WOrmMongodb(opt = {}) {
             ee.emit('change', mode, data, res)
         }
         catch (err) {
-            console.log(err)
+            diag('change handler threw', { mode, ...getBriefErr(err) }, () => err, true)
         }
     }
 
@@ -160,7 +196,7 @@ function WOrmMongodb(opt = {}) {
             ee.emit('error', mode, data, getErrMsg(err))
         }
         catch (errEmit) {
-            console.log(errEmit)
+            diag('error handler threw', { mode, ...getBriefErr(errEmit) }, () => errEmit, true)
         }
     }
 
@@ -427,7 +463,7 @@ function WOrmMongodb(opt = {}) {
             find = cvOrmFind(find)
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //database, collection
             let database = client.db(db)
@@ -499,7 +535,7 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //database, collection
             let database = client.db(db)
@@ -600,7 +636,7 @@ function WOrmMongodb(opt = {}) {
             data = procDocs(data)
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
             await client.connect()
@@ -850,7 +886,7 @@ function WOrmMongodb(opt = {}) {
             data = procDocs(data)
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
             await client.connect()
@@ -1104,7 +1140,7 @@ function WOrmMongodb(opt = {}) {
             if (size(msgBads) < size(data)) {
 
                 //client
-                client = new MongoClient(url)
+                client = genClient()
 
                 //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
                 await client.connect()
@@ -1206,7 +1242,7 @@ function WOrmMongodb(opt = {}) {
             if (size(msgBads) < size(data)) {
 
                 //client
-                client = new MongoClient(url)
+                client = genClient()
 
                 //connect, 令連線失敗於刪除前即拋出, 屬影響全部數據之整批性錯誤
                 await client.connect()
@@ -1351,7 +1387,7 @@ function WOrmMongodb(opt = {}) {
             find = cvOrmFind(find)
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //database, collection
             let database = client.db(db)
@@ -1456,7 +1492,7 @@ function WOrmMongodb(opt = {}) {
             })
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //connect, 令連線失敗於寫入前即拋出, 屬影響全部數據之整批性錯誤
             await client.connect()
@@ -1599,7 +1635,7 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //core
             let u8a = await core(pk)
@@ -1723,7 +1759,7 @@ function WOrmMongodb(opt = {}) {
             if (size(msgBads) < size(data)) {
 
                 //client
-                client = new MongoClient(url)
+                client = genClient()
 
                 //connect, 令連線失敗於刪除前即拋出, 屬影響全部數據之整批性錯誤
                 await client.connect()
@@ -1884,7 +1920,7 @@ function WOrmMongodb(opt = {}) {
             find = cvOrmFind(find)
 
             //client
-            client = new MongoClient(url)
+            client = genClient()
 
             //database
             let database = client.db(db)
