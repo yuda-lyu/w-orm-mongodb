@@ -6,10 +6,11 @@ import WOrm from '../src/WOrmMongodb.mjs'
 import { calls } from './tools/diagScenario.mjs'
 
 
-//rulebook R-DIAG-01-5: 連線設定錯誤(new MongoClient(url)解析連線字串失敗)之訊息、stack與cause不回顯帳密
+//rulebook R-DIAG-01(依dspec〈診斷輸出與遮罩〉): 連線設定錯誤(new MongoClient(url)解析連線字串失敗)之訊息、stack與cause不回顯帳密
 //驅動在連線字串無法解析時會回顯其中一段(如缺少@主機之 mongodb://帳號:密碼 被當成host:port, 訊息為 Unable to parse 帳號:密碼 with URL, cause.input亦含該字串);
-//本套件於往外拋之前把憑證以***取代: 錯誤物件(類別、原型、訊息前綴)不變, 11個公開函數之reject與error事件所收到者皆為遮罩後之同一個錯誤
-//不連線(各函數皆於new MongoClient階段失敗), 不需資料庫
+//本套件於各函數之批次catch經wsemi之diag.err(秘密由getDiagSecrets自opt.url導出, 樣式宣告mongoHostEcho)遮除憑證: 含憑證者為同類別(原型相同、instanceof同類)之副本,
+//訊息前綴不變, 11個公開函數之reject與error事件所收到者為遮罩後之錯誤; 不含憑證者為驅動原物件
+//不連線(各函數皆於new MongoClient階段失敗), 不需資料庫; 本檔37種連線字串形態 × 11個公開函數為真驅動之接線測試(形態由真驅動產生, 非wsemi語料所能代替)
 
 
 let U = 'Zuser9'
@@ -49,8 +50,9 @@ let allText = (err) => {
 }
 
 
-let noMarks = (text, msg = '') => {
-    for (let s of MARKS) {
+//noMarks, allow為該案刻意不遮之單獨帳號(依D3), marks為該案額外須遮之憑證
+let noMarks = (text, msg = '', allow = [], marks = []) => {
+    for (let s of [...MARKS.filter((v) => allow.indexOf(v) < 0), ...marks]) {
         assert.ok(text.indexOf(s) < 0, `${msg}含憑證[${s}]: ${text.slice(0, 300)}`)
     }
 }
@@ -79,8 +81,9 @@ let cases = [
     { label: '不含任何憑證之解析失敗: 訊息與驅動原訊息完全相同', url: 'mongodb://', type: 'MongoParseError', expect: null },
     { label: '不含憑證之port筆誤(無@時整段主機位址項視為憑證)', url: 'mongodb://db.local:abc', type: 'MongoRuntimeError', expect: 'Unable to parse *** with URL' },
     //以下為外審(Argon)探測所揭露之形態
-    { label: '帳號段含驅動拒收之未編碼字元(/): 驅動回顯帳號', url: `mongodb://CORP/${U}:${P}@db.local:27017`, type: 'MongoParseError', expect: 'Username contains unescaped characters ***' },
-    { label: '帳號段含/且「密碼」寫在帳號位置', url: `mongodb://${U}/${Z2}:123@db.local:27017`, type: 'MongoParseError', expect: 'Username contains unescaped characters ***' },
+    //帳號段含/者: wsemi之getDiagSecrets把「/」兩側之片段(畸形網址之權限段與帳號片段)各列為憑證, 故驅動回顯之 CORP/帳號 遮為 ***/***(修改前為整段單一***; 皆不含憑證)
+    { label: '帳號段含驅動拒收之未編碼字元(/): 驅動回顯帳號', url: `mongodb://CORP/${U}:${P}@db.local:27017`, type: 'MongoParseError', expect: 'Username contains unescaped characters ***/***' },
+    { label: '帳號段含/且「密碼」寫在帳號位置', url: `mongodb://${U}/${Z2}:123@db.local:27017`, type: 'MongoParseError', expect: 'Username contains unescaped characters ***/***' },
     { label: '@出現在查詢字串(appName=svc@prod): 單獨密碼被驅動回顯', url: `mongodb://${U}:${P}@db.local:27017/mydb?maxPoolSize=${P}&appName=svc@prod`, type: 'MongoParseError', expect: 'Expected maxPoolSize to be stringified int value, got: ***' },
     { label: '@出現在查詢字串且缺@主機(反向書寫)', url: `mongodb://h:27017@${U}:${P}/mydb?appName=svc@prod`, type: 'MongoRuntimeError', expect: 'Unable to parse *** with URL' },
     { label: '缺@主機且密碼含空白: 驅動將空白正規化為%20後回顯', url: `mongodb://${U}:${W}`, type: 'MongoRuntimeError', expect: 'Unable to parse *** with URL' },
@@ -91,7 +94,9 @@ let cases = [
     { label: 'authMechanismProperties內名稱含TOKEN之屬性值', url: `mongodb://u1:p1@db.local:27017/?authMechanismProperties=AWS_SESSION_TOKEN:${T}&maxPoolSize=${T}`, type: 'MongoParseError', expect: 'Expected maxPoolSize to be stringified int value, got: ***' },
     { label: 'authMechanismProperties內SERVICE_NAME為一般設定值: 不得遮罩', url: `mongodb://u1:p1@db.local:27017/?authMechanismProperties=SERVICE_NAME:${S}&maxPoolSize=${S}`, type: 'MongoParseError', expect: null },
     { label: '無=之參數(名稱含Password)被驅動整段回顯', url: `mongodb://u1:p1@db.local:27017/?tlsCertificateKeyFilePassword:${MN}`, type: 'MongoAPIError', expect: 'URI option "***" cannot be specified with no value' },
-    { label: 'proxyUsername之值被驅動回顯', url: `mongodb://db.local:27017/?proxyHost=p.local&proxyUsername=${PU}&proxyPassword=Zpp456&maxPoolSize=${PU}`, type: 'MongoParseError', expect: 'Expected maxPoolSize to be stringified int value, got: ***' },
+    //proxyUsername之值為單獨帳號(非憑證): 依dspec〈診斷輸出與遮罩〉D3對外錯誤值只遮憑證、不遮單獨帳號(修改前遮罩), 故驅動回顯之帳號值原樣; 其與proxyPassword之並列形式、proxyPassword之值仍遮罩(見下一案)
+    { label: 'proxyUsername之值被驅動回顯(單獨帳號: 依D3不遮)', url: `mongodb://db.local:27017/?proxyHost=p.local&proxyUsername=${PU}&proxyPassword=Zpp456&maxPoolSize=${PU}`, type: 'MongoParseError', expect: null, allow: [PU] },
+    { label: 'proxyPassword之值被驅動回顯: 遮罩', url: `mongodb://db.local:27017/?proxyHost=p.local&proxyUsername=${PU}&proxyPassword=Zpp456&maxPoolSize=Zpp456`, type: 'MongoParseError', expect: 'Expected maxPoolSize to be stringified int value, got: ***', marks: ['Zpp456'] },
     { label: 'checkKeys=true為布林選項, 不得因參數名含key而把訊息中的true遮罩', url: `mongodb://${U}:${P}@db.local:27017/?checkKeys=true&tls=bad`, type: 'MongoParseError', expect: null },
     { label: 'url為String包裝物件(驅動接受)', url: `mongodb://${U}:${P}`, box: true, type: 'MongoRuntimeError', expect: 'Unable to parse *** with URL' },
     { label: 'url為String包裝物件且@出現在查詢字串', url: `mongodb://${U}:${P}@db.local:27017/?maxPoolSize=${P}&appName=svc@prod`, box: true, type: 'MongoParseError', expect: 'Expected maxPoolSize to be stringified int value, got: ***' },
@@ -141,7 +146,7 @@ describe('urlerr', function() {
                         assert.strictEqual(Object.getPrototypeOf(rej), Object.getPrototypeOf(base))
                         assert.strictEqual(rej.message, c.expect === null ? base.message : c.expect)
                         //帳密不出現在訊息、stack、cause鏈與inspect全展開
-                        noMarks(allText(rej), `${name} `)
+                        noMarks(allText(rej), `${name} `, c.allow, c.marks)
                         //error事件: 於reject當下即已恰一次, payload為同一訊息, change不發
                         assert.deepStrictEqual(evs, [['error', name, rej.message]])
                     })
@@ -233,7 +238,7 @@ describe('urlerr', function() {
                 let { code, out } = await run(c.url)
                 assert.notStrictEqual(code, 0, '未捕獲之reject應使行程失敗')
                 assert.ok(out.indexOf(c.expect) >= 0, `stderr應含遮罩後之訊息[${c.expect}]: ${out.slice(0, 300)}`)
-                noMarks(out, 'stderr ')
+                noMarks(out, 'stderr ', c.allow, c.marks)
             })
         }
 

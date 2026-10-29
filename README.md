@@ -48,14 +48,14 @@ MongoDB的BSON會把孤立代理字元(UTF-16代理對被拆開後只剩一半�
 
 未變：`{}`、未給、`undefined`皆代表全部；白名單內之條件，命中集合不變(MongoDB式語意)；`select`回傳仍不含`_id`。需要被移除之功能者(如模糊比對)，請改為`select`後於記憶體過濾。
 
-### 診斷輸出(`opt.logDetail`、`opt.funLog`，`w-orm-*`系列一致)
+### 診斷輸出與對外錯誤值之遮罩(`opt.logDetail`、`opt.funLog`，`w-orm-*`系列一致)
 
-本套件自行輸出的只有一種情形：`change`或`error`事件的訂閱函數拋錯(該錯誤不影響操作結果，故僅被吞下並輸出)。所有輸出皆經**單一出口**(`src/getDiag.mjs`)。服務的console常被收進日誌系統，訂閱函數所拋錯誤的訊息可能帶有主鍵(下游系統中可能是使用者識別或電子郵件)、資料值或連線字串，不應預設落入日誌，故本版起**預設只輸出固定標籤與不含個資之摘要**。連線字串與帳密(`opt.url`整串、帳密段、單獨之密碼與帳號、URL編碼與解碼形式、查詢參數中名稱含`pass`/`pwd`/`secret`/`token`/`credential`/`user`者之值，如`tlsCertificateKeyFilePassword`、`proxyPassword`、`proxyUsername`與`authMechanismProperties`內的`AWS_SESSION_TOKEN`)於**任何輸出管道**(預設、`logDetail`、`funLog`)一律以`***`取代。
+本套件自行輸出的只有一種情形：`change`或`error`事件的訂閱函數拋錯(該錯誤不影響操作結果，故僅被吞下並輸出)。所有輸出皆經**單一出口**：[wsemi](https://github.com/yuda-lyu/wsemi)之`getDiag`(遮罩、摘要、輸出規則皆由wsemi之共用模組`getDiag`、`getDiagSecrets`、`maskDiagText`、`maskDiagCopy`、`maskDiagErr`、`getDiagBriefErr`擁有，各函數之用法與已知限制見其說明；本套件只宣告秘密來源、代碼集合與具名樣式，不另寫遮罩)。服務的console常被收進日誌系統，訂閱函數所拋錯誤的訊息可能帶有主鍵(下游系統中可能是使用者識別或電子郵件)、資料值或連線字串，不應預設落入日誌，故**預設只輸出固定標籤與不含個資之摘要**。連線字串與帳密(`opt.url`整串、帳密段、密碼、URL編碼與解碼形式、查詢參數中名稱含`pass`/`pwd`/`secret`/`token`/`credential`/`user`者之值，如`tlsCertificateKeyFilePassword`、`proxyPassword`、`proxyUsername`與`authMechanismProperties`內的`AWS_SESSION_TOKEN`)於**診斷輸出之任何管道**(預設、`logDetail`、`funLog`)一律以`***`取代。
 
 | 選項 | 預設 | 說明 |
 |---|---|---|
-| `opt.logDetail` | `false` | 為`true`時還原舊版之細節輸出(裸輸出訂閱函數所拋之錯誤，與舊版的`console.log(err)`同格式)。可能含資料值與id，**僅供除錯**。非`true`之值一律忽略並用預設(型別錯誤處理同`opt.autoGenPk`)。 |
-| `opt.funLog` | 無 | 函數`(label, safe, detail)`。給予時診斷輸出**只**交給它、不寫console。`label`為固定標籤，`safe`為不含個資之摘要，`detail`為完整細節(無細節時不帶此引數)，其中連線憑證已以`***`取代，供使用端自行遮罩或轉送至自己的日誌。`detail`是**遮罩拷貝**且有大小上限：純物件(類別實例成為純物件，不保留原型)、陣列(含非索引鍵)、`Error`(含message、stack、`cause`與自有欄位)、`Date`會被複製，包裝字串(`new String`)取其字串值；深度超過6層者為`'[Truncated]'`，節點(含鍵)合計超過2000時其餘鍵不再複製並加上`'[Truncated]': true`標記鍵；函數、二進位資料、`Map`/`Set`、其他包裝物件、存取器以標記字串代替(`'[Function]'`、`'[Binary 12 bytes]'`、`'[Object]'`、`'[Getter/Setter]'`)；不會執行使用端的getter、自訂`inspect`與二進位資料上自行定義的`byteLength`(例外：使用端拋出的Proxy物件，本套件無法偵測Proxy，其trap可能被觸發，拋錯一律被吞下)。非函數之值忽略；`funLog`拋錯、回傳reject之promise(含覆寫了`then`的原生promise)，皆不影響操作。 |
+| `opt.logDetail` | `false` | 為`true`時於console輸出標籤與遮罩後之細節(`console.log(label, 訂閱函數所拋之錯誤之遮罩副本)`)。可能含資料值與id，**僅供除錯**。非`true`之值一律忽略並用預設(型別錯誤處理同`opt.autoGenPk`)。 |
+| `opt.funLog` | 無 | 函數`(label, safe, detail)`。給予時診斷輸出**只**交給它、不寫console。`label`為固定標籤，`safe`為不含個資之摘要(只含`mode`、`errType`、`errCode`)，`detail`為完整細節(無細節時不帶此引數)，其中連線憑證已以`***`取代，供使用端自行遮罩或轉送至自己的日誌。`detail`是**遮罩拷貝**且有大小與深度上限(規則見wsemi之`maskDiagCopy`)，不會執行使用端的getter、自訂`inspect`等程式，不改動原物件。非函數之值忽略；`funLog`拋錯、回傳reject之原生promise，皆不影響操作。 |
 
 兩個選項皆於建構時取值，其後改動`opt`不影響已建立之實例。
 
@@ -70,7 +70,7 @@ MongoDB的BSON會把孤立代理字元(UTF-16代理對被拆開後只剩一半�
 // 正式環境: console上只有標籤與摘要
 let wo = WOrm({ url, db, cl })
 
-// 除錯: 還原舊版細節(連線憑證仍遮罩)
+// 除錯: 輸出標籤與遮罩後細節(連線憑證仍遮罩)
 let wd = WOrm({ url, db, cl, logDetail: true })
 
 // 轉送至自己的日誌，自行遮罩
@@ -83,11 +83,16 @@ let wf = WOrm({
 })
 ```
 
-**破壞性變更**：僅輸出內容改變——各函數 resolve／reject 之內容與時機、`change`與`error`事件之 payload 皆與舊版相同(有固定預期值測試逐一比對)。
+**破壞性變更**(診斷輸出與遮罩改由wsemi之共用模組擁有，需`wsemi`≥1.9.31，不保留舊行為)：各函數 resolve 之內容、`change`與`error`事件之 payload 與時機皆與舊版相同(有固定預期值測試逐一比對)，改變的是下列輸出與錯誤值：
 
-- 訂閱函數拋錯時，console上不再出現該錯誤的訊息、堆疊與其中的資料；需要者加`logDetail: true`或讀`funLog`。
-- **連線字串無法被驅動解析時**，驅動所拋錯誤的訊息、堆疊與`cause`可能回顯帳密(例：缺少`@主機`的`mongodb://帳號:密碼`會被當成`host:port`，訊息為`Unable to parse 帳號:密碼 with URL`，`cause.input`亦含該字串；`error`事件的 payload 與未捕獲時 Node 印到 stderr 的內容也是它)。本版起往外拋出前把憑證以`***`取代：**錯誤的類別(`MongoRuntimeError`、`MongoParseError`等)、原型與訊息前綴不變**，如`Unable to parse *** with URL`。規則：整串連線字串、帳密段(第一個`/`、`?`、`#`之前以最後一個`@`為界，並另以整串最後一個`@`為界再解析一次取聯集，故路徑或查詢字串含`@`時亦不漏)、密碼(4字元以上)、查詢參數中名稱含`pass`/`pwd`/`secret`/`token`/`credential`/`user`者之值(4字元以上)與`authMechanismProperties`內名稱含上列字樣之屬性值(如`AWS_SESSION_TOKEN`；`SERVICE_NAME`等一般設定值不遮)皆取代，並含各自的百分比解碼(寬鬆，不完整之編碼亦可)、URL編碼、空白換成`%20`、`+`視為空白與`;`分段等驅動可能回顯的形式；帳號段含驅動拒收的未編碼字元(`/ ? # [ ] @`)時驅動會回顯該帳號(`Username contains unescaped characters …`)，該帳號亦取代；`@`之後的主機位址項僅在合於「主機名稱或`[IPv6]`，可帶最多5位數字之port」時才保留(如`db.local:99999`)，其餘(如`host:abc`、`[::1`、反向書寫時落在`@`之後的`帳號:密碼`)取代；沒有`@`時(`host:port`會被驅動當成帳號:密碼之筆誤形態)主機位址項全部取代；另不依賴已知秘密，驅動回顯的`Unable to parse <主機位址> with URL`與其`cause.input`(`iLoveJS://<主機位址>`)中不合主機樣式者一律取代。`opt.url`為`String`包裝物件(驅動接受)時同字串處理。不含憑證的解析失敗(如`Invalid scheme, expected connection string to start with "mongodb://" or "mongodb+srv://"`)訊息與驅動原訊息完全相同。建構函式(`WOrm(opt)`)自身的錯誤訊息一向為固定詞彙(`invalid opt.url: string contains lone surrogate`)，不回顯連線字串。
-- 未涵蓋：①驅動執行期的連線錯誤(認證失敗、連不上)由驅動產生，實測其訊息只含位址(`connect ECONNREFUSED 127.0.0.1:27017`)或固定文字(`Authentication failed.`)，不含帳密，本套件不改動它；②MongoDB驅動自身的日誌(`MONGODB_LOG_*`環境變數或`mongodbLogPath`選項，預設關閉，開啟後驅動會輸出指令與資料)與`process.emitWarning`(如過時選項警告)不經本套件的出口，也不受`funLog`控制；③短於3字元的單獨帳號或密碼(如`mongodb://e@host`的`e`)不取代——取代會把標籤、錯誤訊息與路徑中的同字元一併吞掉(例如把操作別`select`變成`s***l***ct`)，其本身也無保密價值；連線設定錯誤的取代不含單獨之帳號(驅動只在帳號含未編碼字元時回顯，見上)，`logDetail`與`funLog`之細節中單獨的帳號在至少3字元時才取代；摘要中的操作別(`mode`)為本套件填入的固定詞彙，不經取代；④反向筆誤的`host:port@帳號:純數字且不超過5位的密碼`，`@`之後的`帳號:密碼`合於「主機:port」樣式而被視為主機位址保留。
+- **`opt.logDetail`為`true`之輸出格式**：由舊版的`console.log(err)`裸輸出，改為`console.log(label, 錯誤之遮罩副本)`——多了標籤(`change handler threw`或`error handler threw`)，細節為遮罩後之**副本**(不沿用使用端之原型)，仍輸出至stdout。預設輸出(只有標籤與摘要)與`funLog`之引數不變。
+- **對外之錯誤值(各函數之`reject`、`error`事件之訊息引數、`save`/`del`/`delGfs`逐筆結果之`err`)**：舊版只對`new MongoClient(url)`解析連線字串失敗之錯誤做**原地**遮罩；本版起擴及**全部**外來錯誤值(驅動與後端拋出之錯誤、關閉連線之錯誤、使用端輸入之存取器於複製時拋出之值)：含連線憑證者(整串連線字串、帳密段、`帳號:密碼`並列形式、密碼(4字元以上)、查詢參數中名稱含`pass`/`pwd`/`secret`/`token`/`credential`/`user`者之值、`authMechanismProperties`內之秘密屬性值、畸形連線字串之片段，含其百分比解碼、URL編碼等驅動可能回顯之形式，另含驅動回顯之`Unable to parse <主機位址> with URL`中不合主機樣式者)以`***`取代，如`Unable to parse *** with URL`。
+  - **含憑證者改為「同類別之副本」，不再原地改寫**：副本與原錯誤同類別(`instanceof`成立、原型與`code`等非憑證欄位保留)但不是同一個物件；不含憑證者仍為驅動原物件(身分不變)。
+  - **單獨之帳號不取代**(只遮憑證，與儲存路徑同)：例如查詢參數`proxyUsername`之值被驅動回顯時原樣(修改前會遮罩)；`帳號:密碼`並列形式、`proxyPassword`之值照遮。帳號段含`/`者，驅動回顯之`CORP/帳號`改為`***/***`(`/`兩側之片段各自遮罩；修改前為單一`***`)。
+  - **本套件自身以固定詞彙組成之錯誤不經遮罩**(`invalid id: …`、`invalid data: …`、`invalid find: …`、`invalid opt.<名>: …`)，即使密碼恰為其中之字樣也原樣(遮罩固定字串會讓缺口反推密碼)。
+  - 不含憑證之解析失敗(如`Invalid scheme, expected connection string to start with "mongodb://" or "mongodb+srv://"`)訊息與驅動原訊息完全相同。`opt.url`為`String`包裝物件(驅動接受)時同字串處理。
+- 摘要(`safe`)只含`mode`(本套件填入之固定操作別)、`errType`與`errCode`：`errType`為內建錯誤類別名(驅動之`MongoServerError`等類別一律列為`Error`)，`errCode`依wsemi宣告之集合(系統錯誤名、Node與TLS代碼，及MongoDB伺服端錯誤碼與其`codeName`，如`11000`)。
+- 未涵蓋：①驅動執行期的連線錯誤(認證失敗、連不上)由驅動產生，實測其訊息只含位址(`connect ECONNREFUSED 127.0.0.1:27017`)或固定文字(`Authentication failed.`)，不含帳密；若日後含憑證，同樣會被上列規則遮罩；②MongoDB驅動自身的日誌(`MONGODB_LOG_*`環境變數或`mongodbLogPath`選項，預設關閉，開啟後驅動會輸出指令與資料)與`process.emitWarning`(如過時選項警告)不經本套件的出口，也不受`funLog`控制；③短於4字元之密碼於對外錯誤值不取代(取代會把訊息中之同字樣一併吞掉，其本身也無保密價值；診斷輸出之細節不設下限，單獨帳號至少3字元)；其餘已知限制見wsemi之`getDiag`、`getDiagSecrets`、`maskDiagErr`說明。
 
 ## Documentation
 To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-orm-mongodb/WOrmMongodb.html).

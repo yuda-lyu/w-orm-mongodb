@@ -7,9 +7,9 @@ import { genUrl, startContainer, stopContainer } from './lib/api-setup.mjs'
 import { ID, PW, scenario, scenarioOffline, settle } from './tools/diagScenario.mjs'
 
 
-//rulebook R-DIAG-01: 診斷輸出(console)之預設安全與可控, 對真實MongoDB(自建docker容器)驗證
+//rulebook R-DIAG-01(依dspec〈診斷輸出與遮罩〉, 遮罩與輸出由wsemi之getDiag擁有): 診斷輸出(console)之預設安全與可控, 對真實MongoDB(自建docker容器)驗證
 //  R-DIAG-01-1 預設只輸出標籤與不含個資之摘要(不含資料值、id、訂閱函數所拋錯誤之原文、連線憑證)
-//  R-DIAG-01-2 opt.logDetail為true還原舊版細節輸出(裸輸出訂閱函數所拋之錯誤), 連線字串與帳密一律以***遮罩
+//  R-DIAG-01-2 opt.logDetail為true輸出標籤與遮罩後之細節(訂閱函數所拋之錯誤), 連線字串與帳密一律以***遮罩
 //  R-DIAG-01-3 opt.funLog(label, safe, detail)取代console收完整細節(憑證仍遮罩)
 //  R-DIAG-01-4 診斷輸出不得影響各操作之resolve/reject內容與事件payload: 對照修改前(git HEAD)程式所產生之固定預期值test/tools/diagGolden.json
 //  R-DIAG-01-5 驅動執行期之連線錯誤(認證失敗、連不上)不含帳密(觀察)
@@ -162,29 +162,29 @@ describe('diaglog', function() {
 
     describe('logDetail(R-DIAG-01-2)', function() {
 
-        it('true: 裸輸出訂閱函數所拋之錯誤(與舊版console.log(err)同格式), 連線字串與帳密以***遮罩, 資料值照舊', async function() {
+        it('true: 輸出標籤與訂閱函數所拋之錯誤(label加錯誤之遮罩副本), 連線字串與帳密以***遮罩, 資料值照舊', async function() {
             let opt = getOpt({ logDetail: true })
             let w = WOrm(opt)
             w.on('change', throwing(opt.url))
             let { res, lines } = await capture(() => settle(w.insert({ id: ID, name: 'AliceSecret' })))
             assert.deepStrictEqual(res, { ok: { n: 1, nInserted: 1, ok: 1 } })
             assert.strictEqual(lines.length, 1)
-            assert.ok(lines[0].startsWith(`Error: listener ${ID} ${PW} AliceSecret ***`), lines[0].slice(0, 160))
+            assert.ok(lines[0].startsWith(`change handler threw Error: listener ${ID} ${PW} AliceSecret ***`), lines[0].slice(0, 160))
             noCred(lines[0])
             await WOrm(opt).delAll()
         })
 
-        it('true: error訂閱函數拋錯亦裸輸出', async function() {
+        it('true: error訂閱函數拋錯亦輸出標籤與錯誤', async function() {
             let opt = getOpt({ logDetail: true })
             let w = WOrm(opt)
             w.on('error', throwing(opt.url))
             let { lines } = await capture(() => settle(w.select({ $foo: 1 })))
             assert.strictEqual(lines.length, 1)
-            assert.ok(lines[0].startsWith('Error: listener'), lines[0].slice(0, 80))
+            assert.ok(lines[0].startsWith('error handler threw Error: listener'), lines[0].slice(0, 80))
             noCred(lines[0])
         })
 
-        it('舊版輸出格式: 預設關閉時無細節, 開啟後與console.log(原錯誤)首行相同', async function() {
+        it('輸出格式: 預設關閉時無細節, 開啟後為label加console.log(原錯誤)之格式(首行相同)', async function() {
             let opt = getOpt({ logDetail: true })
             let w = WOrm(opt)
             let e0 = new Error('plain listener only')
@@ -201,7 +201,7 @@ describe('diaglog', function() {
             finally {
                 console.log = o
             }
-            assert.strictEqual(lines[0].split('\n')[0], old[0].split('\n')[0])
+            assert.strictEqual(lines[0].split('\n')[0], `error handler threw ${old[0].split('\n')[0]}`)
         })
 
         it('非true之值(字串、數字、物件)忽略並用預設(安全輸出)', async function() {

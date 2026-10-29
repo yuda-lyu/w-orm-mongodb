@@ -2,7 +2,37 @@
 
 本檔為執行工作時特有之累積經驗,留給後續之嘗試、執行與判斷,由agent自行編列、擴充與維護.
 
-## 診斷輸出(2026-10-28,mongo-run01,規則 R-DIAG-01)之作法與陷阱
+## 診斷輸出遷移至 wsemi 共用模組(2026-10-29,mig-mongo,規則 R-DIAG-01)之作法與陷阱
+
+**下方〈診斷輸出(2026-10-28,mongo-run01)〉之遮罩函數(`getSecrets`/`maskText`/`cpMask`/`maskErr`/`getBriefErr`)與其測試手法已隨 `src/getDiag.mjs` 刪除而作廢;其「盤點與前提」「外審」中關於驅動行為之事實(驅動回顯形態、`MONGODB_LOG_*`)仍有效。**
+
+### 作法
+
+- **區分「外來值」與「本套件固定詞彙」不能靠 catch 內判斷**:同一個 `catch` 會收到 `cvOrmFind`/`procDocs` 之固定詞彙錯誤與驅動之錯誤。作法同 pg:`ours`(WeakSet)登記自身之錯誤(`ownErr()`、`cvFind()` 包 `cvOrmFind` 後登記其拋出之 Error),`outErr(err) = ours.has(err) ? err : diag.err(err)`。`cvOrmFind` 之固定詞彙實測成立:使用端存取器拋錯被其轉為 `invalid find: … an exception was thrown while reading the condition`;`chkPk` 合格之 id 絕不會使 `cvOrmFind({ filename: id })` 失敗(5MB 長字串、`￾`、` ` 皆通過,只有 NUL/孤立代理被拒,而二者已被 `chkPk` 擋下)→ `delGfs` 逐筆 `catch` 收不到自身錯誤,`outMsg` 無需 `ours` 分支(原寫了即為不可達死碼,變異 `outMsg-always-mask` 存活而查出,已刪)。
+- **站點全集要連 `finally` 與 `try` 外一起列**:①`finally` 內 `await client.close()`(驅動拋錯會取代原結果,屬外來 reject,11 處)→ `closeClient`;②`insert`/`insertBulk`/`save`/`del` 於 `try` 之外之 `cloneDeep(data)`(lodash 讀使用端存取器與 Proxy 陷阱,其拋出之值為外來值,且不發 `error` 事件——修改前即如此,不要順手改成發事件)→ `cloneData`;③內部轉手(`pm.reject`、`throw err`、`throw errIns`、`_findGfs`)不遮,讓 `isDupKeyError`/`ENOENT` 判定用原值,由最外層 catch 遮罩一次。
+- **`genClient` 不再遮罩**:`new MongoClient(url)` 之 11 呼叫點皆在 `try` 內,批次 `catch` 之 `outErr` 即遮罩;舊版之「原地遮罩」改為 `diag.err` 之「同類別副本」,故 `unit-urlerr` 之 `Object.getPrototypeOf(rej) === Object.getPrototypeOf(base)` 仍成立,但 `rej !== base`。
+- **level**:舊 `bare=true` 站點之舊輸出為 `console.log(err)`,故兩站 level 皆 `'log'`(stdout);`bare` 消失後 `logDetail` 之輸出多了標籤。
+- **wsemi 行為差異(unit-urlerr 之 3 形態期望變更,皆非洩漏)**:①帳號段含 `/`(`mongodb://CORP/帳號:密碼@…`)驅動回顯 `CORP/帳號`,reject 清單把兩側片段各列為秘密,遮為 `***/***`(舊為單一 `***`);②`proxyUsername=XXX` 之值被驅動回顯時原樣(單獨帳號只在 detail 清單,D3/Q3 不遮;舊版遮),`帳號:密碼` 並列與 `proxyPassword` 之值照遮。
+
+### 測試手法
+
+- **假驅動取代 docker**:`test/tools/fakeMongo.mjs` 於建構 `WOrm` 時把 `mongodb.MongoClient` 換成假類別(`Object.defineProperty(mongodb, 'MongoClient', { get })`,建構後立即還原;`WOrm` 於工廠函數內 `let MongoClient = mongodb.MongoClient` 取值,故只需在建構瞬間替換,不影響其他測試檔),`ctor`/`connect`/`db`/`close`/`col` 接縫各以函數注入外來值。`GridFSBucket` 仍用真類別(假 db 只需 `collection()`),`delGfs`/`delAllGfs` 之查找經假 `find().toArray()` 失敗;`selectByPkGfs`/`delAllGfs` 以 `db()` 同步拋錯注入(真 `GridFSBucket` 之串流難以假造)。11 函數各有主要注入接縫(`ops` 表)。
+- **「全無效」批次不可用 `{ id: '' }`**:`save`/`insert` 之 `procPk` 以 `isestr(v.id)` 判定,空字串視為「未帶 id」而由 `autoGenPk` 補值(變成有效筆、會連線並發 `insert` 之 `change`);要造「全部不合格」請用 `a<孤立代理>`、`b<NUL>`。`del`/`delGfs` 不補值,`''` 才算無效。
+- **固定詞彙原樣之測法**:對照組(密碼為 `Zq9xYw7k`,非任何固定詞彙之子字串)與 9 個為固定詞彙子字串之密碼(`invalid`、`string`、`data`、`find`、`unsupported`、`surrogate`、`autoGenPk`、`u8a_`、`empty`)逐項比較 `{ rej, res, evs }`,且斷言對照組文字確含至少一個該密碼(否則測不到誤遮罩)。誤包固定詞彙之變異(`outErr` 恆包、`ownErr`/`cvFind` 不登記、各處退回裸 `new Error`/`cvOrmFind`)皆被殺死。
+- **語料接線**:`import dc from 'wsemi/src/_diagCases.mjs'`;`DISPOSITION` 表逐案登記處置(wire 案新增時「分類完整」案轉紅);`dc.verify(c, out, ctx)` 之 `ctx.sec.url` 可直接當 `opt.url`(假驅動不解析);語料 R02/R07/R11/R12/C01/O01/O15 之 `call()` 形狀與本套件呼叫點不同,以接線版(adapt)斷言。
+- **修前紅**:`git archive HEAD src | tar -x -C tmp/<名>/pre`,新測試與 `fakeMongo.mjs`/`diagScenario.mjs`/`urlerrWorker.mjs` 複製到 `pre/test/`,以一次性腳本(`spawnSync(node, [mocha.js, …], { cwd: pre })`,不入庫;原始碼掃描案讀 `./src` 故 cwd 須為複本夾)執行:修前 88 紅、其餘為「保持不變」之守護案(固定詞彙原樣等,修前綠為正常)。
+- **變異執行器** `test/tools/diagMutRun.mjs`(入庫;`node test/tools/diagMutRun.mjs [名稱子字串…]`,repo 根為 cwd,用 `quiet-run --lock` 包,離開碼 0 表全數殺死;新增站點時於其 `muts` 補變異;於 `src/` 改名或改寫接縫時 needle 找不到會回報「未套用」):讀 `src/WOrmMongodb.mjs`,以 `nth`(第 n 個出現)/`once`(須恰一個)文字取代產生變異,寫入 `tmp/diagmut/work/<名>/src/`,複製三個單元檔與 `test/tools/` 到該夾,`mocha --bail --reporter json` 並行 4 個;複本位於 repo 之下,`wsemi`/`mongodb` 由 node 往上層找到 repo 之 `node_modules`,不需連接點。變異集:11 函數各漏包一個 catch、誤包固定詞彙 12 型、逐筆 err 未遮 5 型、`closeClient`/`cloneData` 不遮與旁路 17 型、宣告退化 5 型、level/摘要 4 型、自寫遮罩 1 型,共 53 個(`outMsg` 不可達分支已刪)。
+
+### P8 探測(`getDiagBriefErr` 是否須另讀 `codeName`)
+
+- 自建 `mongo:8` 容器(`docker rm -f -v` 銷毀並回驗無殘留),以原生 `MongoClient` 製造 24 種錯誤(重複鍵 4 型、`CommandNotFound`、`TypeMismatch`、`IndexOptionsConflict`/`IndexKeySpecsConflict`、`ImmutableField`、`BadValue`、`CursorNotFound`、`MaxTimeMSExpired`、文件驗證失敗、無效資料庫與集合名、超大文件、standalone 交易、認證失敗、未授權、連不上、DNS 失敗),逐項記 `code`/`codeName`/`errorResponse`/`getDiagBriefErr` 結果。結論:`code` 恆為整數;`mongoServer` 集合內整數與 `codeName` 成對,**無任何一例僅 `codeName` 命中**,故不需另讀 `codeName`;集合內之 `codeName` 字串因 `code` 非字串而不會命中(無害之死項)。`errType` 對驅動類別一律為 `Error`(未宣告 `types`)。探測腳本不入庫(一次性),逐項證據在主控證據夾 `agent-out/mig-mongo-p8-證據.json`。
+
+### 其他
+
+- **暫存目錄打包驗證 dist**:`w-package-tools/src/rollupFiles.mjs` 之 `fdTar` 指向 `./tmp/…`(不動 `./dist`):UMD 工廠相依仍只有 `mongodb`、`stream`(與修前相同),`require("util")` 來自 lodash 之 `freeModule.require('util').types`(修前同);UMD 由 64873 增為 98724 位元組(+33.8 KB,含 wsemi 診斷模組)。UMD 於 Node `require` 後實跑 `select` 之遮罩 reject 與 `logDetail` 輸出皆正確。
+- **`npm i wsemi@latest` 使 `package-lock.json` 大量改動**:Verdaccio 之版本不寫 `resolved` 欄位,lock 之 `resolved`(registry.npmjs.org)行被移除(約 1100 行 diff),並把 lock 內之套件版本 `1.2.9` 同步為 `package.json` 之 `1.2.11`(npm 行為,非手改 `version`);`package.json` 尾端換行亦被 npm 補上。主控發布前留意此噪音。
+
+## 診斷輸出(2026-10-28,mongo-run01,規則 R-DIAG-01)之作法與陷阱〔遮罩函數已於 2026-10-29 遷至 wsemi,見上節〕
 
 ### 盤點與前提
 

@@ -100,7 +100,7 @@
 5. **檢查之值即使用之值**:`insert`/`insertBulk`/`save`/`del` 於 `cloneDeep` 複本上檢核與使用;`insertGfs` 於淺拷貝 `{ ...v }` 上檢核與使用(只寫入 `id` 與 `u8a`,不深拷貝大型位元組);`delGfs` 先複製為普通陣列再僅取一次 `id`(`ids[k]`);`del` 同樣只取一次 `ids[k]`;`selectByPk`/`selectByPkGfs` 之 `pk` 為原始字串.以上皆在第一個 `await` 之前同步完成(呼叫後立即改動原輸入不影響).
 6. **訊息**:固定詞彙、不回顯值;`save`/`del`/`delGfs` 逐筆迴圈取批次索引(`pmSeries` 回呼第二參數 `k`);原 `invalid id[<回顯值>]` 一併去回顯(主控裁示 D6).`autoGenPk:false` 而未帶有效 `id` 之既有訊息 `invalid data[<k>].id, autoGenPk is false` 不變(整批 reject,先於同一筆之良構檢核).
 7. **不隨 `autoGenPk` 改變**:`autoGenPk:false` 時同樣檢核.
-8. **`client = genClient()`(原 `new MongoClient(url)`,R-DIAG-01-5 起經 `genClient` 遮罩連線設定錯誤)一律在 `try` 內**(11 個函數):`url` 解析失敗(`Invalid scheme`、`Protocol and host list are required`)時同步拋錯,須走 `catch → emitError → reject`,`error` 事件於 reject 前恰一次(審計 §3.9;修前 8 函數於 `try` 外,reject 而不發 `error`).`finally` 以 `client !== null` 防護 `close()`.
+8. **`client = genClient()`(原 `new MongoClient(url)`,R-DIAG-01-5 起經 `genClient`;連線設定錯誤由各函數批次 `catch` 之 `outErr`〔`diag.err`〕遮罩)一律在 `try` 內**(11 個函數):`url` 解析失敗(`Invalid scheme`、`Protocol and host list are required`)時同步拋錯,須走 `catch → emitError → reject`,`error` 事件於 reject 前恰一次(審計 §3.9;修前 8 函數於 `try` 外,reject 而不發 `error`).`finally` 以 `client !== null` 防護 `close()`.
 
 **站點全集與判準**(行號為 2026-10-20 實作後;日後以函數名為準,行號請以盤點指令重算)
 
@@ -147,64 +147,20 @@
 7. 排序規則弱相等(mssql/Jet)與本套件無關(MongoDB 以 BSON 位元組比對,D4 只文件化).
 8. 建構後改動 `opt` 不再影響實例(行為變更,檢查之值即使用之值);須改位址請重新建構.
 
-## R-DIAG-01 診斷輸出之單一出口與預設安全(2026-10-28,mongo-run01)
+## R-DIAG-01 診斷輸出與對外錯誤值之遮罩(依 dspec〈診斷輸出與遮罩〉;2026-10-29 mig-mongo 遷移至 wsemi 共用模組)
 
-規格:主控任務書(第 153 項同型之個資輸出;`C:\opensrcOper\dnow\20261028054319`)。選項名稱與語意比照 w-serv-orm 1.1.20(`opt.logDetail`、`opt.funLog(label, safe, detail)`),同批 w-orm-reladb 1.1.16、w-serv-webdata 1.1.18 已完成;各套件自行實作,不抽到 wsemi。
+**規格與單一擁有者**:跨套件規格為主控 `C:\opensrcOper\dspec\診斷輸出與遮罩.md`(原則 D1~D5、裁定 Q1~Q4 與 P1~P9;設計 `dnow\20261029002013\agent-out\diag-run01-設計.md` §6);遮罩、摘要、診斷出口之實作與形態規則由 **wsemi** 擁有(`getDiag`、`getDiagSecrets`、`maskDiagText`、`maskDiagCopy`、`maskDiagErr`、`maskDiagUrl`、`getDiagBriefErr`、`genDiagFunLog`;wsemi 之規則帳本 `sgud/rule/rulebook_diag.md` R-DIAG-01 為準,各函數 JSDoc 為用法之準)。本套件**只宣告**秘密來源、代碼集合、具名樣式、`safeKeys` 與呼叫點,**不得另寫等價遮罩**(D1);mongo-run01(2026-10-28)自寫之 `src/getDiag.mjs` 已刪。
 
-**成因**:服務的 console 常被收進日誌系統,`emitChange`/`emitError` 內 catch 原以 `console.log(err)` 輸出訂閱函數所拋之整個錯誤(其訊息可含主鍵、資料值、連線字串);另驅動在 `new MongoClient(url)` 解析失敗時所拋之錯誤(訊息、stack、`cause.input`)會回顯連線字串中的 `帳號:密碼` 片段(缺 `@主機` 時被當成 host:port,實測 `Unable to parse 帳號:密碼 with URL`)。
+**本套件之宣告與規則句**
 
-**單一擁有者**:`src/getDiag.mjs`(`getOptLog`、`getSecrets`、`maskText`、`cpMask`、`maskErr`、`getDiag`、`getBriefErr`)。`WOrmMongodb.mjs` 內**不得**直接呼叫 `console`、寫 `process.stdout/stderr`、`emitWarning`;不得使用 Node 內建模組於 `getDiag.mjs`(dist 由 rollup 打包,`toolg/gDistRollup.mjs` 之 external 只列 events、stream、mongodb)。
+1. **宣告**(`src/WOrmMongodb.mjs` 建構段,唯一一處):`getDiag(opt, { secrets: getDiagSecrets({ urls: [url] }), codes: ['mongoServer'], patterns: ['mongoHostEcho'], safeKeys: ['mode'] })`。選項(`opt.logDetail` 僅 `=== true`、`opt.funLog` 僅函數)由 `getDiag` 於建構時取快照,其後改動 `opt` 不影響實例;秘密由建構時之 `url` 導出(wsemi 已處理連線字串之複合認證參數、寬鬆百分比解碼、無 `@` 之反向筆誤等)。不宣告 `types`、`nested`、`paths`、`values`(見已知限制 3)。
+2. **外來值之 catch 站點包 `diag.err`;套件自身以固定詞彙組成之 reject 不包**(D3、設計 §6.5-1,固定字串被挖空即可反推短密碼)。實作:`ours`(WeakSet)登記本套件自身之錯誤——`ownErr(msg)`(`procPk`、`procDocs`、`insertGfs` 共 4 處 throw)與 `cvFind`(`cvOrmFind` 之接縫,其 `invalid find: …` 為固定詞彙,使用端存取器拋錯亦被其轉為固定詞彙);`outErr(err)` = `ours.has(err) ? err : diag.err(err)`,各函數批次 `catch` 以 `res = outErr(err)` 取得對外之值(reject 與 `error` 事件之訊息同源)。建構期之 `invalid opt.<名>` throw 為固定詞彙,不包。
+3. **逐筆 `err` 於建立時 `diag.mask`**:`save`/`del`/`delGfs` 逐筆失敗(驅動呼叫之外來值)以 `outMsg(err)` = `diag.mask(getErrMsg(err))`;本套件自身之逐筆 `err: msgBad`(`invalid id: …`、`invalid data: …`)原樣。
+4. **其餘外來值接縫**:`closeClient`(`finally` 內關閉連線,驅動拋錯經 `diag.err`)、`cloneData`(`insert`/`insertBulk`/`save`/`del` 於 `try` 之外複製使用端輸入,存取器與 Proxy 陷阱拋出之值經 `diag.err`;拋出位置在 `try` 外故仍不發 `error` 事件,同修改前)、`genClient`(`new MongoClient(url)` 之同步拋錯,各呼叫點皆在 `try` 內,由批次 `catch` 遮罩;**不再原地遮罩**)。
+5. **`emitChange`/`emitError` 之訂閱函數拋錯**:`diag('change handler threw' | 'error handler threw', { mode, ...diag.brief(err) }, () => err, 'log')`:預設只輸出標籤與 `{ mode, errType, errCode? }`,不取細節;`logDetail` 為 `console.log(label, 遮罩副本)`(**level 為 `'log'`**——舊版為 `console.log(err)`,維持 stdout;無 `bare` 參數,logDetail 之標籤不再省略);`funLog(label, safe, detail)` 取代 console。`emitError` 不再遮罩(其同時收自身之固定詞彙錯誤;外來值已於站點遮罩);`data` 為呼叫端輸入,屬回傳契約,不在規則內。
+6. **回傳契約**:各操作 resolve 內容、`change`/`error` 事件之 payload 與時機不變(`test/tools/diagGolden.json` 由修改前之 git HEAD 程式產生,**不得以現行程式重產**,見 `test/tools/diagGoldenGen.mjs` 檔頭);改變者僅列於 README〈破壞性變更〉:`logDetail` 輸出格式、對外錯誤值之遮罩範圍(含憑證者為同類別之副本、不再原地改寫;單獨帳號不遮;`***/***`)。
 
-**規則句**
-
-1. **單一出口**:src 內所有診斷輸出經 `diag(label, safe, getDetail, bare)`。`diag` 於建構時由 `getDiag(getOptLog(opt), getSecrets(url))` 建立,選項取值為建構時快照(其後改動 `opt` 不影響實例),憑證由建構時之 `url` 導出。
-2. **預設只輸出標籤與不含個資之摘要**:`change handler threw { mode, errType, errCode? }`、`error handler threw { mode, errType, errCode? }`。`mode` 為函數名(固定詞彙);`errType` 為錯誤建構子名稱(須合 `^[A-Za-z][A-Za-z0-9_]{0,39}$`,否則 `Error`;非 Error 值為 `string`/`object`/`null`/`number` 等型別名);`errCode` 僅放行機器代碼(絕對值至 99999 之整數、`E…`/`ERR_…` 字串)。不輸出訊息、堆疊、資料值、id。摘要值若恰等於已知憑證(如數字密碼同時為代碼)以 `***` 取代(`maskSafe`)。預設時不取細節(`getDetail` 不被呼叫)。
-3. **`opt.logDetail`**:僅 `=== true` 生效,其餘值(含字串 `'true'`、`1`)忽略並用預設,與本套件其他選項(`autoGenPk` 型別錯誤即用預設)一致;`true` 時 console 裸輸出遮罩後之錯誤(`bare=true`,與舊版 `console.log(err)` 同格式)。
-4. **`opt.funLog(label, safe, detail)`**:僅函數生效;給予時診斷輸出只交給它、不寫 console;`detail` 為 `cpMask` 遮罩拷貝(不改動原物件、不沿用原型、不執行 getter 與 `inspect.custom`、深度 6/節點 2000 為界);它拋錯或回傳 reject 之 promise/thenable 皆被吞下。
-5. **連線字串與帳密於任何輸出管道一律 `***`**:`getSecrets(url)` 列出整串連線字串、帳密段(嚴格解析〔第一個 `/ ? #` 之前,最後一個 `@` 為界〕與寬鬆解析〔整串最後一個 `@`〕取聯集,故路徑/查詢字串含 `@` 不漏)、單獨密碼、單獨帳號、`@` 後不合主機樣式之項(無 `@` 時全部主機項)、查詢參數中名稱含 `pass|pwd|secret|token|credential|user` 者之值(不含單獨之 `key`:`checkKeys` 為布林選項)與 `authMechanismProperties` 內名稱含上列字樣之屬性值(`SERVICE_NAME`、`CANONICALIZE_HOST_NAME` 為一般設定值,不遮),各取原樣、寬鬆百分比解碼、URL 編碼、空白換 `%20`、`+` 視為空白、`;` 分段等驅動可能回顯之形式;**所有項目短於 3 字元(`SECRET_MIN`)者一律不列**(列入會把標籤、訊息、堆疊、路徑中的同字元一併吞掉,如操作別 `select` 變 `s***l***ct`;其本身也無保密價值);`maskText` 另遮罩 `scheme://帳密@`(取至最後一個 `@`,不跨 `? #`);`cpMask` 遮罩字串值、屬性鍵(含陣列之非索引鍵)、Symbol 描述與同值數字(≥4 位);摘要(`safe`)中固定詞彙之鍵 `mode` 不經遮罩。`opt.url` 為 `String` 包裝物件(驅動接受)時同字串處理。
-6. **R-DIAG-01-5 連線設定錯誤之遮罩**:`new MongoClient(url)` 一律經 `genClient()`(11 處),其 `catch` 以 `maskErr(err, secretsConn)` **原地**遮罩同一錯誤物件之 message、stack(僅內建 getter 才讀取並改為資料屬性)、自有字串欄位與 `cause` 鏈,再往外拋;錯誤類別、原型、訊息前綴不變;改寫只變更 `value`(沿用原屬性的 writable/enumerable/configurable),不可設定但可寫者改以賦值。`secretsConn = getSecrets(url, true)`:不含單獨帳號——**除非帳號含驅動拒收之未編碼字元 `/ ? # [ ] @`**(驅動於 `Username contains unescaped characters <帳號>` 回顯);不含短於 4 字元之單獨密碼與查詢值。另**不依賴已知秘密**:`maskHostEcho` 對驅動回顯之 `Unable to parse <主機位址> with URL` 與 `cause.input`(`iLoveJS://<主機位址>`)中不合主機樣式者(`^[A-Za-z0-9._-]+|[IPv6]` 加最多 5 位數字之 port,逗號分隔)一律取代——驅動回顯前會把空白等字元正規化(如 `%20`),與連線字串原文不同,僅靠字串比對遮罩不到。不含憑證之解析失敗訊息與驅動原訊息逐字相同。建構函式自身之訊息(`invalid opt.<名>: string contains lone surrogate`)為固定詞彙,不回顯,無需遮罩。
-7. **回傳契約不變**:各操作 resolve/reject 內容、`change`/`error` 事件 payload 與時機不變(僅診斷輸出;及第 6 點在錯誤本就含憑證時之訊息)。固定預期值 `test/tools/diagGolden.json` 由**修改前之 git HEAD** 程式執行 `test/tools/diagScenario.mjs` 產生,**不得以現行程式重產**(重現法見 `test/tools/diagGoldenGen.mjs` 檔頭)。
-
-**站點全集與判準**(行號為 2026-10-28 實作後;日後以函數名為準)
-
-| 站點 | 檔案:行 | 修前輸出 | 判準 |
-|---|---|---|---|
-| `emitChange` catch | `src/WOrmMongodb.mjs:177` | `console.log(err)` | 須改 → `diag('change handler threw', …, true)` |
-| `emitError` catch | `:199` | `console.log(errEmit)` | 須改 → `diag('error handler threw', …, true)` |
-| `new MongoClient(url)` 驅動解析錯誤 | `:134 genClient`;呼叫點 `:466 :538 :639 :889 :1143 :1245 :1390 :1495 :1638 :1762 :1923` | 經 reject 與 `error` 事件往外(非 console),含帳密片段 | 須改 → `maskErr`(R-DIAG-01-5) |
-| 其餘 `console`/`process.stdout|stderr`/`emitWarning`(src) | — | 0 處 | — |
-| 已註解之 console | `src/` 0 處 | — | — |
-| 驅動自身日誌(`MONGODB_LOG_*`、`mongodbLogPath`)與 `process.emitWarning`(過時選項) | `node_modules/mongodb/lib/mongo_logger.js`、`utils.js:794` | 預設關閉;開啟後輸出指令與資料 | 可留(由環境變數明示開啟,不經本套件出口;README 載明) |
-| 驅動執行期連線錯誤(認證失敗、連不上) | 驅動 | 實測只含位址或固定文字 | 可留(`api-diaglog` 觀察案釘住不含帳密) |
-| 範例/工具 `g-basic.mjs`、`g-gfs.mjs`、`g-unique.mjs`、`toolg/*` | repo 根 | 示範程式 console | 非 src,不計 |
-
-**盤點指令**(重跑;結果須與上表一致)
-
-- `Grep "console\.|process\.(stdout|stderr)|emitWarning" src/` → 只可命中 `src/getDiag.mjs`(`getDiag` 內 `console.log`)。
-- `Grep "new MongoClient|genClient" src/WOrmMongodb.mjs` → `new MongoClient` 恆為 1 處(`genClient` 內);`client = genClient()` 恆為 11 處。
-- `Grep "^import" src/getDiag.mjs` → 0 處(不使用內建模組)。
-- `Grep "diag\(" src/WOrmMongodb.mjs` → 2 處(`emitChange`、`emitError`)。
-
-**對應測試**(`npm test` 即全跑;單檔:`npx mocha test/unit-diaglog.test.mjs --timeout 60000`)
-
-| 測試檔 | 內容 |
-|---|---|
-| `test/unit-diaglog.test.mjs`(不連線) | 單一出口掃描;`getOptLog`;`getSecrets`(各形態、`isConn`、不丟例外);`maskText`;`cpMask`(鍵、Symbol、數值、原型、getter、Error、循環、上限);`getDiag`(預設/logDetail/funLog/吞錯/防禦遮罩);`getBriefErr`;`maskErr`;11 個公開函數 × `error` 訂閱函數拋錯、`change` 站點(離線)、非 Error 值、選項型別錯誤、快照 |
-| `test/unit-urlerr.test.mjs`(不連線) | 36 種連線字串形態(含外審揭露之:帳號含未編碼字元、`@` 在查詢字串、空白/`+`/`;`/不完整 `%`、無 `=` 參數、`proxyUsername`、`String` 包裝物件、`checkKeys`/`SERVICE_NAME` 不得被遮、單字元帳號不得吞同字元)× 11 個公開函數:reject 為遮罩後同一類別之錯誤、訊息逐字等於預期、message/stack/cause/inspect 無憑證、`error` 事件 payload;建構函式固定詞彙;非字串 url;spy 驗 `MongoClient` 仍以原 url 建立;子行程未捕獲 reject 之 stderr |
-| `test/api-diaglog.test.mjs`(自建 docker 容器) | 8 個會發 `change` 之函數 + `error` 站點之預設輸出;`logDetail`(含舊版格式);`funLog`;選項型別/快照;回傳契約對照 HEAD golden(連線情境 11 函數成功與失敗路徑 + 事件 payload;不連線情境);驅動執行期連線錯誤不含帳密 |
-| `test/tools/diagScenario.mjs`、`diagGoldenGen.mjs`、`diagGolden.json`、`urlerrWorker.mjs` | 共用情境、golden 產生器、golden(HEAD 產生)、子行程腳本 |
-
-**變異**(須轉紅;於 `./tmp/mongo-run01/mutwork/` 複本執行,不動 `src/`;執行器 `tmp/mongo-run01/mut/run.mjs`,tmp 被 `.gitignore`):見 `sgud/exp/experience.md`〈mongo-run01〉。
-
-**已知限制**
-
-1. 驅動自身日誌(`MONGODB_LOG_*`)與 `process.emitWarning` 不經本套件出口(預設關閉,環境變數明示開啟)。
-2. 短於 3 字元之單獨帳號或密碼不遮罩(`SECRET_MIN`);連線設定錯誤之遮罩不含一般的單獨帳號(驅動僅在帳號含未編碼字元時回顯,該情形已遮罩);`logDetail`/`funLog` 細節中單獨帳號 ≥3 字元才遮罩。
-3. 反向筆誤 `host:port@帳號:純數字且 ≤5 位之密碼`:`@` 後之 `帳號:密碼` 合主機樣式而被視為主機位址保留(僅在驅動因其他原因拋出解析錯誤並回顯該項時才會出現)。
-4. 摘要之 `errType` 為建構子名稱:程式識別字不能證明無個資(樣式白名單),不要把個資放進自訂錯誤類別名稱。
-5. `cpMask` 副本對自訂 Error 類別只保留類別名稱(`name` 取原型上之資料屬性或建構子名稱)與同名空殼建構子(副本原型為「只帶同名建構子之空殼」,其上層為內建 `Error.prototype`,使 `util.inspect` 首行與原錯誤一致),不沿用使用端原型;`Map`/`Set` 以 `'[Object]'` 代替;節點預算用盡時其餘鍵不複製並加 `'[Truncated]': true` 標記鍵。
-6. 不使用 `util.types`(不引入內建模組),故**無法偵測 Proxy**:使用端拋出 Proxy 物件時,摘要與拷貝可能觸發其 trap(拋錯一律被吞下);README 已載明。
-7. 摘要之 `errCode` 僅放行 `E[A-Z_]{2,30}`(不含數字)與 `ERR_…`、絕對值 ≤99999 之整數;`errType` 為程式識別字樣式——樣式不能證明無個資,勿把個資放進自訂錯誤類別名稱或 `code`。
+**索引**:站點全集與處置(S1~S10)、盤點指令、對應測試、變異、已知限制(含 P8 結論)見 `sgud/rule/rulebook_diag.md`(節號 R-DIAG-01 不變)。
 
 ## 破壞性變更紀錄
 
@@ -219,3 +175,7 @@
    - `change`/`error` 訂閱函數拋錯時,console 預設改為只輸出 `change handler threw { mode, errType, errCode? }` / `error handler threw { … }`,不再輸出整個錯誤(訊息、堆疊、其中的資料值與 id);要還原舊輸出加 `logDetail: true`,或以 `funLog(label, safe, detail)` 接收。連線憑證於所有管道以 `***` 遮罩。
    - 驅動在連線字串無法解析時所拋之錯誤(`Unable to parse 帳號:密碼 with URL` 等,含 `cause.input` 與 stack)中的憑證改為 `***`;類別、原型、訊息前綴不變;不含憑證之訊息不變。
    - 不變:各操作 resolve/reject 內容、`change`/`error` 事件 payload 與時機(對照 HEAD golden)。
+3. **2026-10-29 診斷輸出與遮罩改由 wsemi 共用模組擁有**(R-DIAG-01,mig-mongo;需 `wsemi` ≥ 1.9.31;版號由發布流程決定,本次未改 `version`;不保留舊行為):
+   - `opt.logDetail` 為 `true` 之輸出由舊版 `console.log(err)` 裸輸出改為 `console.log(label, 錯誤之遮罩副本)`(多標籤、副本不沿用使用端原型,仍為 stdout);預設輸出與 `funLog` 引數不變。
+   - 對外之錯誤值(各函數 reject、`error` 事件之訊息、逐筆 `err`):由「只原地遮罩 `new MongoClient` 解析失敗之錯誤」擴及**全部外來錯誤值**(驅動與後端之錯誤、關閉連線之錯誤、使用端輸入存取器於複製時拋出之值);含憑證者為**同類別之副本**(非同一物件、不原地改寫),不含憑證者為原物件;單獨之帳號不遮(`proxyUsername` 之值被回顯時原樣;`CORP/帳號` 遮為 `***/***`);本套件自身以固定詞彙組成之錯誤(`invalid id/data/find/opt…`)不經遮罩。
+   - 不變:各操作 resolve 內容、`change`/`error` 事件 payload 與時機(對照 HEAD golden)。

@@ -14,6 +14,8 @@ import cvOrmFind from 'wsemi/src/cvOrmFind.mjs'
 import evem from 'wsemi/src/evem.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
 import genIDSeq from 'wsemi/src/genIDSeq.mjs'
+import getDiag from 'wsemi/src/getDiag.mjs'
+import getDiagSecrets from 'wsemi/src/getDiagSecrets.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
@@ -22,7 +24,6 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import isu8arr from 'wsemi/src/isu8arr.mjs'
 import pmSeries from 'wsemi/src/pmSeries.mjs'
-import { getOptLog, getSecrets, maskErr, getDiag, getBriefErr } from './getDiag.mjs'
 
 
 /**
@@ -40,12 +41,13 @@ import { getOptLog, getSecrets, maskErr, getDiag, getBriefErr } from './getDiag.
  * 錯誤訊息為固定詞彙、不回顯值，如invalid id: string contains lone surrogate at [data[1].id]、invalid data: string contains lone surrogate at [data[1].meta.tags[0]]。
  * 詳見README之字串良構檢核。
  *
- * 診斷輸出(R-DIAG-01)：本套件唯一會自行輸出者，為change與error事件之訂閱函數拋錯時(該錯誤不影響操作結果，故僅吞下並輸出)。所有輸出皆經單一出口(src/getDiag.mjs)，
+ * 診斷輸出(R-DIAG-01)：本套件唯一會自行輸出者，為change與error事件之訂閱函數拋錯時(該錯誤不影響操作結果，故僅吞下並輸出)。遮罩與輸出由wsemi之getDiag單一擁有，
  * 預設只輸出固定標籤與不含個資之摘要(操作別、錯誤類別與機器代碼)，不輸出訂閱函數所拋錯誤之訊息、堆疊與其中的資料值、id等。
- * opt.logDetail為true時還原舊版輸出(裸輸出訂閱函數所拋之錯誤)，opt.funLog為函數時改交給它(label, safe, detail)、不寫console；
- * 兩者之細節中，連線字串與帳密(opt.url內之帳號、密碼、查詢參數中名稱含pass/pwd/secret/token/credential/user者之值)一律以***取代。
- * 連線字串無法被驅動解析時(如缺少@主機而被當成host:port)，驅動所拋錯誤之訊息、堆疊與cause可能回顯帳密，本套件於拋出前將其以***取代(錯誤類別與訊息前綴不變)。
- * 各操作之resolve、reject內容與事件payload不受診斷輸出影響。詳見README之Diagnostic output。
+ * opt.logDetail為true時改輸出標籤與遮罩後之細節(訂閱函數所拋之錯誤)，opt.funLog為函數時改交給它(label, safe, detail)、不寫console；
+ * 細節中之連線字串與帳密(opt.url內之帳號、密碼、查詢參數中名稱含pass/pwd/secret/token/credential/user者之值等)一律以***取代，規則見wsemi之getDiag、getDiagSecrets。
+ * 對外之錯誤值(各操作之reject、error事件之訊息、逐筆結果之err)：驅動、後端與使用端程式拋出之值，若含連線憑證(連線字串、密碼、帳密並列形式、查詢參數內之秘密值等)則以***取代，
+ * 不含憑證者原樣(身分不變)，單獨之帳號不遮；本套件自身以固定詞彙組成之錯誤不經遮罩。
+ * 各操作之resolve內容與事件payload不受診斷輸出影響。詳見README之Diagnostic output。
  *
  * @class
  * @param {Object} [opt={}] 輸入設定物件，預設{}
@@ -53,8 +55,8 @@ import { getOptLog, getSecrets, maskErr, getDiag, getBriefErr } from './getDiag.
  * @param {String} [opt.db='worm'] 輸入使用資料庫名稱字串，預設'worm'
  * @param {String} [opt.cl='test'] 輸入使用資料表名稱字串，預設'test'
  * @param {Boolean} [opt.autoGenPk=true] 輸入是否於輸入未帶有效主鍵時自動產生主鍵值，預設true。為false時主鍵須由呼叫端自備，屬依賴注入之定位，主鍵之唯一性、格式與是否與既有資料衝突皆由呼叫端自負。本設定為建構層設定，不得於insert與save之option逐次覆寫
- * @param {Boolean} [opt.logDetail=false] 輸入是否還原舊版之詳細console輸出，預設false。僅true生效(其他值忽略並用預設，同opt.autoGenPk)；true時change與error訂閱函數拋錯會裸輸出該錯誤(含訊息與堆疊，連線憑證仍以***取代)，可能含資料值與id，僅供除錯
- * @param {Function} [opt.funLog] 輸入診斷輸出函數(label, safe, detail)，預設無。僅函數生效(其他值忽略)；給予時診斷輸出只交給它、不寫console，label為固定標籤，safe為不含個資之摘要，detail為完整細節之遮罩拷貝(連線憑證以***取代，不改動原物件)，供使用端自行遮罩或轉送；其拋錯與回傳之promise之reject皆被吞下，不影響操作
+ * @param {Boolean} [opt.logDetail=false] 輸入是否於console輸出遮罩後之細節，預設false。僅true生效(其他值忽略並用預設，同opt.autoGenPk)；true時change與error訂閱函數拋錯會輸出標籤與該錯誤之遮罩拷貝(含訊息與堆疊，連線憑證以***取代)，可能含資料值與id，僅供除錯
+ * @param {Function} [opt.funLog] 輸入診斷輸出函數(label, safe, detail)，預設無。僅函數生效(其他值忽略)；給予時診斷輸出只交給它、不寫console，label為固定標籤，safe為不含個資之摘要，detail為完整細節之遮罩拷貝(連線憑證以***取代，不改動原物件)，供使用端自行遮罩或轉送；其拋錯與回傳之原生promise之reject皆被吞下，不影響操作
  * @returns {Object} 回傳操作資料庫物件，各事件功能詳見說明
  */
 function WOrmMongodb(opt = {}) {
@@ -94,12 +96,53 @@ function WOrmMongodb(opt = {}) {
     })
 
 
-    //diag, 診斷輸出之單一出口(R-DIAG-01), 本檔不得直接呼叫console; 建構時固定取得opt.logDetail與opt.funLog(其後改動opt不影響本實例), 連線憑證由url導出
-    let diag = getDiag(getOptLog(opt), getSecrets(url))
+    //diag, 診斷輸出與對外錯誤值遮罩之單一出口(R-DIAG-01, 規格依dspec〈診斷輸出與遮罩〉, 由wsemi之getDiag擁有), 本檔不得直接呼叫console, 不得自寫遮罩;
+    //建構時固定取得opt.logDetail與opt.funLog(其後改動opt不影響本實例), 連線憑證由url導出(含連線字串、帳密段、密碼、查詢參數之秘密值、驅動可能回顯之各形式);
+    //diag.err遮除外來值(驅動、後端之錯誤、使用端存取器與Proxy陷阱拋出之值)之憑證, 對外之reject、error事件之訊息與逐筆err前必經; 本套件自身以固定詞彙組成之錯誤不經;
+    //codes宣告mongoServer(MongoDB伺服端錯誤碼與codeName), patterns宣告mongoHostEcho(驅動解析主機位址失敗時回顯之 帳號:密碼), safe只放mode(本套件固定操作別)與diag.brief之errType、errCode
+    let diag = getDiag(opt, {
+        secrets: getDiagSecrets({ urls: [url] }),
+        codes: ['mongoServer'],
+        patterns: ['mongoHostEcho'],
+        safeKeys: ['mode'],
+    })
 
 
-    //secretsConn, 連線設定錯誤(驅動解析連線字串失敗)之遮罩用憑證清單
-    let secretsConn = getSecrets(url, true)
+    //ours, ownErr, 本套件自身以固定詞彙組成之錯誤(含wsemi之cvOrmFind): 不經diag.err(對固定字串挖空會讓缺口反推短密碼);
+    //catch站點得到之值若不在此登記一律視為外來值(驅動與後端之錯誤、使用端存取器或Proxy陷阱拋出之值), 經outErr遮除憑證
+    let ours = new WeakSet()
+    function ownErr(msg) {
+        let e = new Error(msg)
+        ours.add(e)
+        return e
+    }
+
+
+    //cvFind, cvOrmFind之接縫: 其拋出之Error為固定詞彙(invalid find: 原因 at [路徑], 使用端存取器拋錯亦被其轉為固定詞彙, 不回顯值), 登記為本套件自身之錯誤
+    function cvFind(find) {
+        try {
+            return cvOrmFind(find)
+        }
+        catch (err) {
+            if (err !== null && typeof err === 'object') {
+                ours.add(err)
+            }
+            throw err
+        }
+    }
+
+
+    //outErr, catch站點之值交給對外(reject、error事件)前之處理: 本套件自身之錯誤原樣, 外來值經diag.err(無憑證者為原物件, 有則為同類別之副本)
+    function outErr(err) {
+        return ours.has(err) ? err : diag.err(err)
+    }
+
+
+    //outMsg, 逐筆結果err欄位之字串(save、del、delGfs之逐筆失敗): 逐筆失敗皆來自驅動呼叫(updateOne、deleteOne、delGfs之查找與刪除)之外來值, 其訊息經diag.mask;
+    //本套件自身以固定詞彙組成之逐筆err(err: msgBad類)不經此函數(delGfs逐筆之cvFind對已經chkPk檢核之id不會失敗, 故此處不會收到ours登記之錯誤)
+    function outMsg(err) {
+        return diag.mask(getErrMsg(err))
+    }
 
 
     //_indexReady, 唯一索引只須建立一次, 以旗標記錄避免每次操作皆多一次round-trip
@@ -125,18 +168,48 @@ function WOrmMongodb(opt = {}) {
 
     /**
      * 建立MongoClient，連線字串無法解析時驅動所拋之錯誤可能回顯帳密(如缺少@主機之mongodb://帳號:密碼會被當成host:port，
-     * 訊息為Unable to parse 帳號:密碼 with URL，其cause的input亦含該字串)，故於往外拋之前將其中憑證以***取代
-     * 註: 原地遮罩，錯誤物件(類別、原型、訊息前綴)不變，各函數之catch、reject與error事件所收到者即為遮罩後之同一個錯誤物件
+     * 訊息為Unable to parse 帳號:密碼 with URL，其cause的input亦含該字串)
+     * 註: 本函數不遮罩，各呼叫點皆於try內，其catch經outErr遮除憑證後才成為reject與error事件所收到之值(R-ORMSTR-01、R-DIAG-01)
      *
      * @ignore
      * @returns {Object} 回傳MongoClient物件
      */
     function genClient() {
+        return new MongoClient(url)
+    }
+
+
+    /**
+     * 關閉MongoClient，驅動關閉時之錯誤為外來值，遮除憑證後再往外拋
+     *
+     * @ignore
+     * @param {Object} client 輸入MongoClient物件
+     * @returns {Promise} 回傳Promise，resolve回傳undefined，reject回傳已遮罩之錯誤
+     */
+    async function closeClient(client) {
         try {
-            return new MongoClient(url)
+            await client.close()
         }
         catch (err) {
-            throw maskErr(err, secretsConn)
+            throw diag.err(err)
+        }
+    }
+
+
+    /**
+     * 深拷貝使用端輸入之數據，與外部使用數據脫勾
+     * 註: 使用端物件之存取器與Proxy陷阱於複製時執行，其拋出之值為外來值，遮除憑證後再往外拋(拋出位置在try之外，故不發error事件，同修改前)
+     *
+     * @ignore
+     * @param {Object|Array} data 輸入數據物件或陣列
+     * @returns {Object|Array} 回傳複本
+     */
+    function cloneData(data) {
+        try {
+            return cloneDeep(data)
+        }
+        catch (err) {
+            throw diag.err(err)
         }
     }
 
@@ -174,7 +247,7 @@ function WOrmMongodb(opt = {}) {
             ee.emit('change', mode, data, res)
         }
         catch (err) {
-            diag('change handler threw', { mode, ...getBriefErr(err) }, () => err, true)
+            diag('change handler threw', { mode, ...diag.brief(err) }, () => err, 'log')
         }
     }
 
@@ -183,6 +256,8 @@ function WOrmMongodb(opt = {}) {
      * 發出error事件，操作發生錯誤時發出，錯誤訊息一律轉為字串
      * 註: 事件僅為附加通知，所送出之資訊必另有正規管道——整批性錯誤經Promise.reject，逐筆失敗經該筆之err欄位
      * 註: 訂閱函數拋錯不得影響本次操作之結果，故另包try並自行吞掉
+     * 註: err為各站點交來之值，外來值(驅動、後端、使用端程式拋出者)已於站點經outErr或outMsg遮除憑證，本套件自身之固定詞彙錯誤原樣；本函數不再遮罩
+     * (其同時收自身之固定詞彙錯誤，一律遮罩會把固定字串挖空而讓缺口反推短密碼)；data為呼叫端輸入，屬回傳契約
      * 註: 正常結果不得發出本事件，如insert全數已存在、save合併後內容相同、del主鍵未命中、selectByPk查無數據
      *
      * @ignore
@@ -196,7 +271,7 @@ function WOrmMongodb(opt = {}) {
             ee.emit('error', mode, data, getErrMsg(err))
         }
         catch (errEmit) {
-            diag('error handler threw', { mode, ...getBriefErr(errEmit) }, () => errEmit, true)
+            diag('error handler threw', { mode, ...diag.brief(errEmit) }, () => errEmit, 'log')
         }
     }
 
@@ -220,7 +295,7 @@ function WOrmMongodb(opt = {}) {
 
             //check, autoGenPk為false時主鍵須由呼叫端自備
             if (!autoGenPk) {
-                throw new Error(`invalid data[${k}].id, autoGenPk is false`)
+                throw ownErr(`invalid data[${k}].id, autoGenPk is false`)
             }
 
             //genIDSeq
@@ -300,7 +375,7 @@ function WOrmMongodb(opt = {}) {
             v = procPk(v, k)
             let msg = chkDoc(v, k)
             if (msg !== null) {
-                throw new Error(msg)
+                throw ownErr(msg)
             }
             return v
         })
@@ -460,7 +535,7 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //cvOrmFind, 須先於建立client與任何讀取, 不合白名單者往外拋(整批性錯誤), 其後一律只用檢核後之複本(檢查之值即使用之值)
-            find = cvOrmFind(find)
+            find = cvFind(find)
 
             //client
             client = genClient()
@@ -484,13 +559,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 條件檢核失敗時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -556,13 +631,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -618,7 +693,7 @@ function WOrmMongodb(opt = {}) {
         }
 
         //cloneDeep
-        data = cloneDeep(data)
+        data = cloneData(data)
 
         //client
         let client = null
@@ -709,13 +784,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 檢核失敗或url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -868,7 +943,7 @@ function WOrmMongodb(opt = {}) {
         }
 
         //cloneDeep
-        data = cloneDeep(data)
+        data = cloneData(data)
 
         //client
         let client = null
@@ -920,13 +995,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 檢核失敗或url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1061,7 +1136,7 @@ function WOrmMongodb(opt = {}) {
                     nInserted: 0,
                     nModified: 0,
                     ok: 0,
-                    err: getErrMsg(err),
+                    err: outMsg(err),
                 }
 
                 break
@@ -1106,7 +1181,7 @@ function WOrmMongodb(opt = {}) {
         }
 
         //cloneDeep
-        data = cloneDeep(data)
+        data = cloneData(data)
 
         //autoInsert
         let autoInsert = get(option, 'autoInsert', true)
@@ -1162,13 +1237,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 檢核失敗或url無效或同批皆不合格時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1210,7 +1285,7 @@ function WOrmMongodb(opt = {}) {
         }
 
         //cloneDeep
-        data = cloneDeep(data)
+        data = cloneData(data)
 
         //client
         let client = null
@@ -1301,7 +1376,7 @@ function WOrmMongodb(opt = {}) {
                             n: 1,
                             nDeleted: 0,
                             ok: 0,
-                            err: getErrMsg(err),
+                            err: outMsg(err),
                         }
 
                     }
@@ -1319,13 +1394,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 同批皆不合格或url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1384,7 +1459,7 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //cvOrmFind, 須先於建立client與任何刪除, 不合白名單者往外拋(整批性錯誤), 其後一律只用檢核後之複本(檢查之值即使用之值), 複本無自有鍵代表全部
-            find = cvOrmFind(find)
+            find = cvFind(find)
 
             //client
             client = genClient()
@@ -1409,13 +1484,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 條件檢核失敗時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1483,10 +1558,10 @@ function WOrmMongodb(opt = {}) {
                 v = procPk(v, k)
                 let msg = chkPk(v.id, k)
                 if (msg !== null) {
-                    throw new Error(msg)
+                    throw ownErr(msg)
                 }
                 if (!isu8arr(v.u8a)) {
-                    throw new Error(`invalid data[${k}].u8a`)
+                    throw ownErr(`invalid data[${k}].u8a`)
                 }
                 return v
             })
@@ -1534,13 +1609,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 檢核失敗或url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1655,7 +1730,7 @@ function WOrmMongodb(opt = {}) {
             }
             else {
                 isErr = true
-                res = err
+                res = outErr(err)
             }
 
         }
@@ -1663,7 +1738,7 @@ function WOrmMongodb(opt = {}) {
 
             //client, url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1681,7 +1756,8 @@ function WOrmMongodb(opt = {}) {
     }
 
 
-    //_findGfs, 內部查找函數, 其reject由delGfs與delAllGfs之catch接住並於該處發出error事件, 故本函數不自行發出
+    //_findGfs, 內部查找函數, 其reject由delGfs與delAllGfs之catch接住並於該處發出error事件, 故本函數不自行發出;
+    //reject之值原樣(驅動之錯誤或登記為本套件自身之cvOrmFind錯誤), 由接住處之catch經outMsg(delGfs逐筆)或outErr(delAllGfs整批)遮除憑證後才對外
     //註: bucket.find之唯一入口, 條件(find)須符合系列白名單, 故於查找前再經cvOrmFind(對delAllGfs已檢核之複本為冪等), delGfs逐筆之{ filename: id }亦經此
     async function _findGfs(find = {}, bucket) {
         let isErr = false
@@ -1691,7 +1767,7 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //cvOrmFind, 不合白名單者往外拋, 其後只用檢核後之複本
-            find = cvOrmFind(find)
+            find = cvFind(find)
 
             //find
             let cursor = bucket.find(find)
@@ -1828,7 +1904,7 @@ function WOrmMongodb(opt = {}) {
                             n: 1,
                             nDeleted: 0,
                             ok: 0,
-                            err: getErrMsg(err),
+                            err: outMsg(err),
                         }
 
                     }
@@ -1846,13 +1922,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 同批皆不合格或url無效時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
@@ -1917,7 +1993,7 @@ function WOrmMongodb(opt = {}) {
         try {
 
             //cvOrmFind, 須先於建立client與任何刪除, 不合白名單者往外拋(整批性錯誤), 其後一律只用檢核後之複本(檢查之值即使用之值), 複本無自有鍵代表全部
-            find = cvOrmFind(find)
+            find = cvFind(find)
 
             //client
             client = genClient()
@@ -1956,13 +2032,13 @@ function WOrmMongodb(opt = {}) {
         }
         catch (err) {
             isErr = true
-            res = err
+            res = outErr(err)
         }
         finally {
 
             //client, 條件檢核失敗時尚未建立
             if (client !== null) {
-                await client.close()
+                await closeClient(client)
                 client = null
             }
 
