@@ -162,6 +162,51 @@
 
 **索引**:站點全集與處置(S1~S10)、盤點指令、對應測試、變異、已知限制(含 P8 結論)見 `sgud/rule/rulebook_diag.md`(節號 R-DIAG-01 不變)。
 
+## R-CLIENTERR-01 連線於操作空檔被中斷時,行程不得因未被監聽之 error 事件而終止(2026-10-31,第 209 項;查證結論:不屬實,src 未改)
+
+**起因**:姊妹套件 w-orm-postgresql(第 162 項)實測「驅動只在無進行中語句時於 client 發 `error` 事件,無人監聽即終止行程」;依共通要求查證本套件 `src` 之 2 處 `.on('error'`(皆為 GridFS 串流,**無任何 `MongoClient` 監聽**)是否涵蓋全部連線物件。
+
+**結論(逐物件,mongodb 驅動 7.5.0〔`node_modules`〕與 7.8.0〔`npm pack` 解包〕讀碼+實測)**:本套件**不需**自掛 `MongoClient` 之 `error` 監聽。驅動於其自建之每個 `EventEmitter` 建構時皆預掛空操作監聽 `this.on('error', noop)`,Node 之「無監聽之 `error` 事件拋出」不會發生;socket 與訊息串流之 `error` 由 `Connection` 自掛(`onSocketError`/`onTransformError` → `cleanup`,只發 `close`,並使在途指令以 `MongoNetworkError` reject)。**唯一不預掛者為 GridFS 之讀/寫串流**(Node `Readable`/`Writable`,驅動以 `destroy(err)`/`callback(err)` 發 `error`),本套件已各自掛 1 處(`_uploadGfs`、`selectByPkGfs`)。
+
+| 物件 | 建立處(src) | 驅動預掛(7.5.0 / 7.8.0 同) | 本套件自掛 | 判準 |
+|---|---|---|---|---|
+| `MongoClient` | `genClient`(11 站點) | `mongo_client.js:66` noop | 無 | 免(驅動已掛) |
+| `Topology`/`Server`/`Monitor`/`ConnectionPool`/`Connection` | 驅動內部 | `topology.js:60`、`server.js:45`、`monitor.js:40`、`connection_pool.js:83`、`connection.js:67` noop;socket 自掛 | 無 | 免 |
+| `ClientSession` | `insertBulk` 交易路徑 `client.startSession()` | `sessions.js:41` noop | 無 | 免 |
+| `FindCursor`(`toArray`) | `select`、`_findGfs`、`delAll` | `abstract_cursor.js:72` noop | 無 | 免 |
+| `GridFSBucket` | `new mongodb.GridFSBucket` 4 處 | `gridfs/index.js:31` noop | 無 | 免 |
+| `GridFSBucketWriteStream` | `_uploadGfs`(`openUploadStream`) | **無**(Node `Writable`) | `sm.pipe(ws).on('error')` | 已套 |
+| `GridFSBucketReadStream` | `selectByPkGfs`(`openDownloadStreamByName`) | **無**(Node `Readable`) | `sm.on('error')` | 已套 |
+| `stream.Readable`(`_uploadGfs` 內 `sm`) | `_uploadGfs` | — | 無(只 `push` 一包資料、不會自發 `error`) | 刻意不掛 |
+| `ChangeStream` | 本套件未用 | — | — | 不適用 |
+
+**規則句**
+
+1. 11 個公開函數於「連線池取用連線之前」(操作空檔,含 `connect()` 之後、各指令之間、`close()` 之前)連線被切斷(RST、FIN),行程不終止(離開碼 0、stderr 無未處理之 `error`/reject),該次操作以既有 resolve/reject 回報,不新增通道。
+2. 對照組:指令送出後、回應被扣住時被切斷,行程亦不終止。
+3. GridFS 上傳/下載串流之 `error` 必由本套件監聽(驅動不預掛);`src` 中 `openUploadStream(`、`openDownloadStream*(` 各恰 1 處且皆緊接 `.on('error'`。
+4. `MongoClient` 只在 `genClient` 內建立(R-ORMSTR-01 第 8 點),新增任何自建之驅動物件(如 `ChangeStream`、自建串流)須先確認其 `error` 是否由驅動預掛,未預掛者本套件自掛並經 `diag`(R-DIAG-01)輸出安全摘要。
+5. 驅動升版後須重跑本節測試:`api-clienterr` 之「driver contract」案若失敗,表示驅動不再預掛某物件之 `error` 監聽,須補掛(此時本規則由「免」改「須套」)。
+
+**盤點指令**(重跑;結果須與上表一致)
+
+- 本套件之 `error` 監聽:`Grep "\.on\('error'" src/WOrmMongodb.mjs` → 恆為 2 處(`_uploadGfs`、`selectByPkGfs`),皆為 GridFS 串流。
+- 驅動預掛:`Grep "this\.on\('error', (utils_1\.)?noop\)" node_modules/mongodb/lib` → 須含 `mongo_client.js`、`sessions.js`、`abstract_cursor.js`、`gridfs/index.js`、`cmap/connection.js`、`cmap/connection_pool.js`、`sdam/topology.js`、`sdam/server.js`、`sdam/monitor.js`。
+- 驅動發 `error` 事件之處:`Grep "emit\((\w+\.)?ERROR|emit\('error'" node_modules/mongodb/lib` → 7.5.0 只有 `change_stream.js`(3 處,本套件未用)與 `sdam/topology.js:405`(相容性錯誤,Topology 已預掛,並經 `mongo_client.js:252-253` 之 `MONGO_CLIENT_EVENTS` 轉送至 `MongoClient`,其亦已預掛)。
+- 驅動物件之建立:`Grep "new mongodb\.|new MongoClient|openUploadStream|openDownloadStream|\.watch\(|startSession" src/WOrmMongodb.mjs` → 只可命中 `genClient`、`GridFSBucket`(4)、`openUploadStream`(1)、`openDownloadStreamByName`(1)、`startSession`(1)。
+
+**對應測試**(單檔:`npx mocha --no-parallel test/api-clienterr.test.mjs --timeout 180000`)
+
+| 測試檔 | 內容 |
+|---|---|
+| `test/api-clienterr.test.mjs` + `test/tools/clientErrScenario.mjs` | ①driver contract:驅動物件預掛 `error` 監聽、GridFS 串流為 0、對預掛者發 `error` 不拋;`src` 之 GridFS 串流皆掛監聽、`MongoClient` 單一接縫。②自建容器(standalone 帶認證、replica set 各一)上,每個情境於獨立子行程,經 TCP 代理於**每一個**連線池取用之前以 RST 切斷全部連線(含監控連線)、第 1 個位置另以 FIN 切斷、另有指令送出後回應被扣住再切斷之對照組:11 函數(standalone)+`insertBulk` 交易路徑(replica set),斷言離開碼 0、無未處理之 `error`、有 RESULT、注入確實發生。③變異:拿掉上傳/下載串流之 `error` 監聽(`test/_tmp/clienterr/` 之 src 副本,取代點須恰 1 次),重複鍵/查無檔案及語句進行中之中斷須使行程終止,本套件版同情境不終止。 |
+
+**已知限制**
+
+1. 注入點為驅動內部檔(`lib/cmap/connection_pool.js` 之 `checkOut`、`lib/cmap/connection.js` 之 `command`),僅於子行程內修補;驅動升版移位時子行程以離開碼 4 回報而使測試失敗,須改接縫而非放寬。
+2. 未涵蓋:伺服端永久不可用(`serverSelectionTimeoutMS` 預設 30 秒後 reject,屬既有失敗通道)、`docker pause` 之凍結(無 socket 事件,靠驅動心跳逾時)、TLS/代理(`proxyHost`)連線;這些路徑之 socket `error` 同樣由 `Connection` 自掛。
+3. 伺服端全域動作之情境(`killAllSessions`、`docker restart`)只在探測期以序列方式實測,未納入 `api-clienterr`(會波及同容器上並行之子行程);其結果與重現法見 `sgud/exp/experience.md`。
+
 ## 破壞性變更紀錄
 
 1. **2026-10-17 條件(find)白名單**(第 33 項批 1d;版號由發布流程決定,本次未改 `version`):

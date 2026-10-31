@@ -76,6 +76,10 @@ describe('wsemi共用語料之接線(D5): wire子集 x 本套件之真實呼叫�
         C01: 'adapt(safe)', O01: 'adapt(logDetail console)', O15: 'adapt(safeKeys宣告)',
         R01: 'adapt(reject身分)', R02: 'adapt(等價案: 畸形網址片段, opt.url為單一來源)', R04: 'adapt(reject字串)', R07: 'adapt(固定詞彙reject原樣, 見下方「固定詞彙」)', R12: 'adapt(reject不遮帳號、detail遮帳號)',
         R11: 'adapt(reject不遮儲存路徑: 本套件未宣告paths, 錯誤自帶path原樣)', A01: 'n/a(本套件不用genDiagFunLog)', A07: 'n/a(本套件不用genDiagFunLog)',
+        //wsemi 1.9.33新增之wire案(第209項升版時補): 皆為共用函數層之行為, 本套件之呼叫點不使用其所測之選項
+        A11: 'n/a(本套件不直接用genDiagFunLog; getDiag之safeKeys宣告見O15)',
+        C14: 'n/a(pg之DatabaseError形態; 本套件未宣告types, 驅動錯誤之errType恆為Error, 見state已知缺口1)',
+        U22: 'n/a(本套件以urls宣告連線來源, 不用conns)',
     }
 
     it('分類完整: 語料wire案(含wsemi日後新增者)皆已於DISPOSITION表處置', function() {

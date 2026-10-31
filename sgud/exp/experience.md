@@ -2,6 +2,28 @@
 
 本檔為執行工作時特有之累積經驗,留給後續之嘗試、執行與判斷,由agent自行編列、擴充與維護.
 
+## 連線於操作空檔被中斷(2026-10-31,第 209 項,規則 R-CLIENTERR-01):查證「是否須自掛 MongoClient error 監聽」之作法與陷阱
+
+**結論先行**:不須自掛(驅動已預掛),`src` 未改。帳本 R-CLIENTERR-01 有逐物件表與盤點指令;此處只記作法與陷阱。
+
+### 查證作法(可重跑)
+
+- **先讀驅動,再實測,二者缺一不可**:`Grep "this\.on\('error'" node_modules/mongodb/lib` 看驅動於哪些 `EventEmitter` 預掛 noop(7.5.0 與 `npm pack mongodb@7.8.0` 解包之 7.8.0 相同);`Grep "emit\((\w+\.)?ERROR" …` 看驅動何處發 `error`;讀碼只能說「應該安全」,實測才是證據。
+- **「src 有幾處 `.on('error'`」不是判準**:本套件 2 處皆為 GridFS 串流(Node `Readable`/`Writable` 不預掛);`MongoClient` 一處也沒掛卻不會崩,因驅動在建構子內 `this.on('error', noop)`。同型缺陷之判準是「該物件之 `listenerCount('error')` 是否為 0 且驅動會對它發 `error`」。
+- **空檔之製造法**(與 pg 之「繼承 `pg.Client` 於 `connect()` 後中斷」不同,mongo 驅動之 `MongoClient` 不易於連線後立即動手):在容器前放 **TCP 代理**(子行程內 `net.createServer`),於**驅動內部之 `ConnectionPool.prototype.checkOut`**(每個指令取連線前必經)注入——到第 N 次取用之前,代理以 `socket.resetAndDestroy()`(RST)或 `destroy()`(FIN)切斷全部連線(含監控連線),等代理端連線數歸零再放行;對照組在 `Connection.prototype.command` 注入:送出第 N 個操作指令時先令代理**扣住伺服端回應**,60 ms 後 RST 切斷(語句進行中,確定性,不靠競態)。以 `createRequire` + 絕對相依路徑取得內部類別(驅動無 `exports` 限制),只改子行程內之原型。
+- **逐操作取得位置全集**:先 `kind:none` 乾跑,讀回 `nCheckOut`/`nOpCmd`(standalone:select 2/1、selectByPk 2/1、insert 4/2、insertBulk 5/2、save 4/2、del 3/1、delAll 2/1、selectByPkGfs 3/2、insertGfs 10/8、delGfs 5/3、delAllGfs 4/3;replica set 之 insertBulk 為 6/3 含 `commitTransaction`),再逐位置各注入一次。`nCheckOut` 比 `nOpCmd` 多的是 `endSessions`(`close()` 時)等非指令取用。
+- **每個情境獨立子行程**:行程終止只有看離開碼與 stderr 才觀察得到(同進程 mocha 內之未處理 `error` 會被 mocha 當成該案失敗,分不清是哪個情境);子行程輸出一行 `RESULT {…}`,離開碼 3 = 種子資料階段失敗(環境,非受測)、4 = 驅動內部接縫移位。
+- **注入須確實發生**:結果帶 `cuts`;`cuts===0` 且 `nCheckOut/nOpCmd` 小於指定位置者為「該位置未到達」(例如資料表已有同 id 致 `insertBulk` 走補償路徑而次數不同),其餘 `cuts===0` 視為測試空轉,不得算通過。
+- **伺服端全域動作**(`killAllSessions`、`docker restart`)以探測腳本序列實測:standalone/replica set 各 22 操作×全部位置 `killAllSessions`(84 案)、各操作首尾位置 `docker restart -t 1`(44 案,真實重啟 mongod),皆 0 終止;`docker run --rm` 之容器可 `docker restart`(不會被 autoremove 移除)。
+
+### 陷阱(本輪實際踩到)
+
+1. **並行子行程共用同一容器時,`killAllSessions` 是全域的**:第一輪 342 案中 1 案(`rs save killsess@2`)以 `MongoWriteConcernError: operation was interrupted` 終止,`stderr` 為 `triggerUncaughtException`,**不是受測操作**——是另一個並行子行程之 `killAllSessions` 中斷了本子行程**種子資料寫入**(`createIndexes` 之 `numIndexesBefore:1`、`createdCollectionAutomatically:true` 為首次建表之寫入;而受測操作之 `save` 之結果被 `try/catch` 接住不會逃逸)。處置:種子失敗改以離開碼 3 標示、伺服端全域動作之情境序列執行;序列重跑 84 案 0 終止,證實為情境互擾而非 `src` 缺陷。**判讀未處理例外時先問「是哪段程式拋的」**:頂層 `await` 之 reject 在 ESM 主模組以 `run_main … triggerUncaughtException` 終止,與未監聽之 `error` 事件之 `Unhandled 'error' event` 字樣不同。
+2. **`quiet-run` 傳空字串引數會被丟掉**:以 `-- node x.mjs main src out "" "" killsess` 時空字串引數消失,位置參數整體前移(`killsess` 被當成操作清單,K=0、0 任務卻 exit 0 通過)。位置參數一律給明確值,並在腳本內對「0 任務」報警。
+3. **`dist`/`docs` 不重建**(發布流程自動產製),本輪未動。
+4. **`npm i wsemi@latest` 之噪音同前**(見下方 mig-mongo 一節):`package.json` 尾端換行被 npm 補上、`package-lock.json` 隨之變動;`version` 未動。
+5. **wsemi 升版會帶來新的共用語料 wire 案,須補 `unit-diagwire` 之 `DISPOSITION` 表**:1.9.31 → 1.9.33 新增 `A11`(`genDiagFunLog` 之 `safeKeys`)、`C14`(pg `DatabaseError` 之 `types`)、`U22`(`getDiagSecrets` 之 `conns`),全套首跑唯一紅案即「分類完整」(表與語料 wire 案集合須全等,設計如此,非缺陷);三案經讀語料確認皆為函數層選項、本套件呼叫點不使用,處置為 `n/a`(理由寫在表內)。日後升版後全套若僅此案紅,先讀語料新案再補表,不可只為了轉綠而填 `n/a`。
+
 ## 診斷輸出遷移至 wsemi 共用模組(2026-10-29,mig-mongo,規則 R-DIAG-01)之作法與陷阱
 
 **下方〈診斷輸出(2026-10-28,mongo-run01)〉之遮罩函數(`getSecrets`/`maskText`/`cpMask`/`maskErr`/`getBriefErr`)與其測試手法已隨 `src/getDiag.mjs` 刪除而作廢;其「盤點與前提」「外審」中關於驅動行為之事實(驅動回顯形態、`MONGODB_LOG_*`)仍有效。**
