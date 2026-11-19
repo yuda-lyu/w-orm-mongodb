@@ -93,12 +93,12 @@
 
 **規則句**
 
-1. **主鍵**(`chkPk`):須為原始字串,不得為空字串、含 NUL 或孤立代理字元;`String` 包裝物件視為非字串(`isestr` 認為是字串,但 BSON 會把它以字元索引存成子文件)——訊息 `invalid id: <原因> at [data[<k>].id]`,原因 ∈ {`not a string`、`string is empty`、`string contains NUL`、`string contains lone surrogate`}.
+1. **主鍵**(`chkPk`):須為原始字串,不得為空字串、含 NUL 或孤立代理字元;`String` 包裝物件視為非字串(wsemi 1.9.69 前 `isestr` 認為它是字串,但 BSON 會把它以字元索引存成子文件;**「未帶」與「給了而不合格」之分界見 R-PKGIVEN-01**)——訊息 `invalid id: <原因> at [data[<k>].id]`,原因 ∈ {`not a string`、`string is empty`、`string contains NUL`、`string contains lone surrogate`}.
 2. **寫入資料**(`chkDoc`:先 `chkPk` 再 `chkOrmData(v, { root: 'data[<k>]' })`):字串值與鍵名(含巢狀、陣列元素、Map/Set、RegExp.source、Error.message 等 `chkOrmData` 走訪者)不得含孤立代理字元,值之 NUL 不檢查(`chkOrmData` 預設)——訊息 `invalid data: <原因> at [data[<k>].<路徑>]`.同一文件主鍵先於資料;同一物件鍵名先於值;同批以索引最小者為準.
 3. **位址**:`opt.url`、`opt.db`、`opt.cl` 為字串且含孤立代理字元者建構時 throw `invalid opt.<名>: string contains lone surrogate`(不檢查 NUL;非字串維持既有行為).**建構時即取值為區域變數 `url`/`db`/`cl`**,其後一律使用該值(檢查之值即使用之值),建構後改動 `opt` 不影響本實例(行為變更,README 載明).
 4. **處置(與既有「無效主鍵」同形)**:`insert`/`insertBulk`/`insertGfs` 於建立 `MongoClient` 與任何寫入**之前**整批檢核,任一筆不合格即整批 reject(`emitError` 於 reject 前恰一次、`change` 不發、不連線、不寫任何一筆);`save`/`del`/`delGfs` 該筆 `{ok:0, err}`(`save` 為 `n:1`、`nInserted:0`、`nModified:0`,`del`/`delGfs` 為 `n:0`、`nDeleted:0`——沿用規格與既有形狀),同批其他筆照常,每個失敗筆各發一次 `error`(`data` 為 `[v]`),整批仍發一次 `change`;**同批皆不合格時不建立 `MongoClient`**;`selectByPk`/`selectByPkGfs` 回 `null`(不連線、不發事件);`select`/`delAll`/`delAllGfs` 之條件依 R-FIND-01(`invalid find`).
 5. **檢查之值即使用之值**:`insert`/`insertBulk`/`save`/`del` 於 `cloneDeep` 複本上檢核與使用;`insertGfs` 於淺拷貝 `{ ...v }` 上檢核與使用(只寫入 `id` 與 `u8a`,不深拷貝大型位元組);`delGfs` 先複製為普通陣列再僅取一次 `id`(`ids[k]`);`del` 同樣只取一次 `ids[k]`;`selectByPk`/`selectByPkGfs` 之 `pk` 為原始字串.以上皆在第一個 `await` 之前同步完成(呼叫後立即改動原輸入不影響).
-6. **訊息**:固定詞彙、不回顯值;`save`/`del`/`delGfs` 逐筆迴圈取批次索引(`pmSeries` 回呼第二參數 `k`);原 `invalid id[<回顯值>]` 一併去回顯(主控裁示 D6).`autoGenPk:false` 而未帶有效 `id` 之既有訊息 `invalid data[<k>].id, autoGenPk is false` 不變(整批 reject,先於同一筆之良構檢核).
+6. **訊息**:固定詞彙、不回顯值;`save`/`del`/`delGfs` 逐筆迴圈取批次索引(`pmSeries` 回呼第二參數 `k`);原 `invalid id[<回顯值>]` 一併去回顯(主控裁示 D6).`autoGenPk:false` 而**未帶** `id`(定義見 R-PKGIVEN-01:`undefined`、`null`、空字串)之既有訊息 `invalid data[<k>].id, autoGenPk is false` 不變(整批 reject,先於同一筆之良構檢核);**給了而不合格**(非字串等)者不再歸此訊息,一律 `invalid id: … at [data[<k>].id]`.
 7. **不隨 `autoGenPk` 改變**:`autoGenPk:false` 時同樣檢核.
 8. **`client = genClient()`(原 `new MongoClient(url)`,R-DIAG-01-5 起經 `genClient`;連線設定錯誤由各函數批次 `catch` 之 `outErr`〔`diag.err`〕遮罩)一律在 `try` 內**(11 個函數):`url` 解析失敗(`Invalid scheme`、`Protocol and host list are required`)時同步拋錯,須走 `catch → emitError → reject`,`error` 事件於 reject 前恰一次(審計 §3.9;修前 8 函數於 `try` 外,reject 而不發 `error`).`finally` 以 `client !== null` 防護 `close()`.
 
@@ -146,6 +146,60 @@
 6. 繼承自原型之可列舉存取器:`cloneDeep` 保留原型,`chkOrmData` 對它呼叫 getter 一次;BSON 序列化(`insertMany`、`updateOne` 之 `$set`)只寫自有鍵、不再讀它(2026-10-20 以 `mongodb.BSON.serialize` 實測:getter 讀取次數維持 1、寫出之文件不含該鍵),故本套件無「檢查之值≠寫入之值」之缺口,不另將存取器固定為資料屬性(帳本規則 15 建議非強制).
 7. 排序規則弱相等(mssql/Jet)與本套件無關(MongoDB 以 BSON 位元組比對,D4 只文件化).
 8. 建構後改動 `opt` 不再影響實例(行為變更,檢查之值即使用之值);須改位址請重新建構.
+
+## R-PKGIVEN-01 主鍵「未帶」與「給了而不合格」之分界(2026-11-19,omg492i;wsemi 1.9.69 連動之修正)
+
+**成因**:wsemi 第 8 批(1.9.69)使判斷函數不收 `String` 包裝物件(使用者 2026-11-16 W-20:`isestr(new String('x'))` 為 `false`)、並以 `typeof`/`tagOf`(內含 `try`)判定,使原以 `!isestr(v.id)` 判「未帶主鍵」之 `procPk` 把**所有**非字串之 `id`(含包裝物件、`Proxy`)視為未帶而靜默換成 `genIDSeq()` 後寫入;`insert({ id: 5 })` 等非字串於修前即同樣被靜默替換(README 原文「其餘非字串依 autoGenPk 補值或拒收」)。主鍵為資料之身分,呼叫端給了錯值而換成新 id 寫入,事後無從對應。
+
+**規則句**
+
+1. **未帶主鍵**僅 `id` 為 `undefined`、`null`(含鍵不存在)與空字串(`''`,既有文件化行為,README〈字串良構檢核〉訊息表;見已知限制 1)。`autoGenPk:true` 時自動產生;`false` 時整批 reject `invalid data[<k>].id, autoGenPk is false`(`save` 亦整批 reject,既有)。判定以 `===` 比對,**不得**改用 `isestr` 等語意隨 wsemi 版本變動之判斷函數,且不呼叫被檢測值之任何方法或陷阱(`Proxy` 值不得因判定而拋錯)。
+2. **給了而非字串**(數字、布林、物件、陣列、`String`/`Number`/`Boolean` 包裝物件、`Symbol`、`BigInt`、`Date`、函式、讀取即拋錯或已撤銷之 `Proxy` 等)一律依 `chkPk` 拒絕 `invalid id: not a string at [data[<k>].id]`(固定詞彙、不回顯值),**不補值、不替換**,**不隨 `autoGenPk` 改變**(`autoGenPk:false` 時亦為此訊息,不再是 `autoGenPk is false`)。
+3. **通道依入口既有之失敗通道**:`insert`/`insertBulk`/`insertGfs` 於連線與寫入之前整批 reject(`error` 事件恰一次、`change` 不發、同批有效筆不寫入);`save` 該筆 `ok:0` 附 `err`(同批其他筆照常,每個失敗筆各一次 `error`;同批皆不合格不連線);`del`/`delGfs` 該筆 `ok:0`;`selectByPk`/`selectByPkGfs` 回 `null`(不連線、不發事件)。
+4. **執行參數**(`opt.autoGenPk`、`insert` 之 `option.returnList`)給了非布林值(含 `Boolean` 包裝物件)依 K3 取預設(`true`/`false`),不拒絕。
+5. 單一包裝套到多個呼叫點:`procPk` 之呼叫點 3 處(`procDocs`〔`insert`、`insertBulk` 共用〕、`save`、`insertGfs`),`chkPk` 之獨立呼叫點 2 處(`del`、`delGfs`),`selectByPk`/`selectByPkGfs` 為各自之內聯檢核;測試逐點接線(見變異)。
+
+**入口全集與修前/修後**(修前＝工作樹乾淨之本庫現行版+wsemi 1.9.69;探測 `./tmp/omg492i/probe*.mjs` 為一次性,結果見 2026-11-19 omg492i 修正報告)
+
+| 入口 | 通道 | 給了非字串:修前 | 給了非字串:修後 | 未帶(`undefined`/`null`/`''`) |
+|---|---|---|---|---|
+| `insert`(`procDocs`) | 整批 reject | `autoGenPk` 開:靜默換新 id 寫入;關:`autoGenPk is false` | `invalid id: not a string` | 不變 |
+| `insertBulk`(`procDocs`) | 整批 reject | 同上 | 同上 | 不變 |
+| `insertGfs` | 整批 reject | 同上(含 `Proxy`) | 同上 | 不變 |
+| `save` | 逐筆 | 開:靜默換新 id 並寫入;關:整批 reject `autoGenPk is false` | 該筆 `ok:0`,`err` 同上 | 不變(關:整批 reject) |
+| `del`、`delGfs` | 逐筆 | `ok:0 not a string` | 不變 | `ok:0`(不補值) |
+| `selectByPk`、`selectByPkGfs` | `null` | `null` | 不變 | `null` |
+
+**wsemi 1.9.69 後語意改變之其餘站點**(`Grep "isestr\(|isbol\(|isnum\(|isarr\(|isearr\(|iseobj\(|isu8arr\(" src/WOrmMongodb.mjs`;1.9.68 與 1.9.69 之 `isestr/isstr/isnbr/isbol` 由 `Object.prototype.toString`/lodash 改 `typeof`,`isobj/isarr/isu8arr` 之標籤判定加 `try`〔拋錯者回 `false`〕)
+
+| 站點 | 呼叫端給的值? | 語意改變 | 處置 |
+|---|---|---|---|
+| `procPk` 之 `isestr(v.id)` | 是(資料身分) | 包裝物件、`Proxy` 由「字串/拋錯」變「未帶」 | **已修**(規則句 1、2) |
+| `selectByPk`、`selectByPkGfs` 之 `!isestr(pk) \|\| chkOrmStr(pk) !== null` | 是(`pk`) | 包裝物件:兩版皆回 `null`;`Proxy`:1.9.68 reject(陷阱拋錯),1.9.69 回 `null` | 不改(回 `null` 即該入口既有之「主鍵值無效」通道,與其他非字串一致;`isestr` 兼負空字串之判定,不可移除) |
+| `isbol(autoGenPk)`(建構) | 是(執行參數) | `Boolean` 包裝物件:1.9.68 視為布林(其真值恆真,`new Boolean(false)` 亦開),1.9.69 起非布林 → 預設 `true` | 依 K3 取預設(規則句 4;`new Boolean(false)` 之實際效果不變:開) |
+| `isbol(returnList)`(`insert`) | 是(執行參數) | `Boolean` 包裝物件:1.9.68 恆為真值而回逐筆陣列,1.9.69 起 → 預設 `false`(聚合物件) | 依 K3 取預設(規則句 4;`new Boolean(true)` 之結果由陣列變聚合物件) |
+| `iseobj(data)`/`isearr(data)`(`insert`、`insertBulk`、`save`、`del`、`insertGfs`、`delGfs` 之輸入容器) | 是(資料容器,非身分) | 包裝物件:兩版皆非容器;**已撤銷或 `Symbol.toStringTag` 拋錯之物件**:1.9.68 reject(陷阱拋錯),1.9.69 起非容器 | 不改(既有設計:非容器一律視為「無數據」之正常結果,`insert(5)`、`insert('abc')`、`insert(null)` 亦同;列為 R-PKGIVEN-01 已知限制 2) |
+| `isu8arr(v.u8a)`(`insertGfs`) | 是(資料) | 已撤銷或拋錯之 `Proxy`:1.9.68 拋錯,1.9.69 回 `false` → `invalid data[<k>].u8a` | 不改(拒絕,仍為拒收通道) |
+| `isestr(message)`(`getErrMsg`) | 否(外來錯誤之 `message`) | `message` 為 `String` 包裝物件者改走 `String(err)` | 不改(輸出整形,非呼叫端之資料身分) |
+| `isestr(get(hello, 'setName'))`、`isestr(msgBad)` ×3、`isearr(writeErrors)`、`isnum(k)`、`iseobj(v)`(`selectByPk` 讀回)、`isbol(_canUseTx)` | 否(驅動回應、內部旗標) | 無 | 不適用 |
+| 建構 `typeof v === 'string'`(`opt.url/db/cl`)、`get(option, 'autoInsert', true)` | 是 | 無(不經 wsemi 判斷函數) | 不適用 |
+
+**盤點指令**
+
+- `Grep "procPk\(" src/WOrmMongodb.mjs` → 恆為 1 處定義 + 3 處呼叫(`procDocs`〔供 `insert`/`insertBulk` 共用〕、`save`、`insertGfs`),呼叫端不得內聯另一份「未帶」判定。
+- `Grep "isestr\(v\.id\)|isestr\(id\)" src/WOrmMongodb.mjs` → 0 處(主鍵之「未帶」判定不得用 `isestr`)。
+- `Grep "isbol\(" src/WOrmMongodb.mjs` → `autoGenPk`、`returnList`、`_canUseTx` 共 3 處(執行參數,K3)。
+
+**對應測試**(單檔:`npx mocha --no-parallel test/api-pk-given.test.mjs --timeout 180000`,約 30 秒):`test/api-pk-given.test.mjs` 245 案——`insert`/`insertBulk`/`insertGfs` × `autoGenPk` 開關 × 16 類非字串 `id`(整批 reject、不寫入、不連線、`error` 恰一次、`change` 不發、不回顯值);`save` 同矩陣(`ok:0`、同批其他筆照常);讀取即拋錯或已撤銷之 `Proxy` 值與自有存取器拋錯 × `insert`/`insertBulk`/`save`/`del`(複製階段 reject、無事件、既有列原樣)、`insertGfs`、`delGfs`、`selectByPk`/`selectByPkGfs`;`del`/`delGfs`/`selectByPk`/`selectByPkGfs` × `autoGenPk` 開關 × 16 類對既有列不誤中且不連線;未帶(鍵不存在、`undefined`、`null`、`''`)× 4 入口 × `autoGenPk` 開關(生成 UUIDv7/整批 reject);單一物件輸入(索引 0)與 `returnList:true`;批次內最小索引與有效筆不寫入;`opt.autoGenPk`/`option.returnList` 非布林取預設;合法字串 id 原樣(對照)。另 `api-wellformed` 〈String 包裝物件之 id 應 reject〉(`test/api-wellformed.test.mjs:571`)為本修正之原紅燈。
+
+**變異**(須轉紅;於 `./tmp/omg492i/mut/<名>/` 之複本執行,執行器為一次性腳本,不動 `src/`):修前碼與 15 項變異全數轉紅、0 存活——判定還原為 `!isestr`(m1)、改為 `typeof !== 'string'`(m2)、拿掉空字串/`null`/`undefined` 之一(m3、m4、m5)、`chkPk` 放行數字(m6)、`procPk` 之 3 個呼叫點逐點改回舊寫法(`procDocs`、`save`、`insertGfs`;m7a、m7b、m7c)、`del`/`delGfs` 之 `chkPk` 放行數字(m8、m9)、`selectByPk`/`selectByPkGfs` 不檢核(m10、m11)、`opt.autoGenPk`/`option.returnList` 之布林判定改為只擋 `undefined`/`null`(m12、m13)。各案 passing/failing 數見 2026-11-19 omg492i 修正報告。
+
+**已知限制**
+
+1. 空字串(`''`)作為 `id` 於 `autoGenPk:true` 時仍視為「未帶」而自動產生(README 既有文件化行為,`api-basic` 既有案釘住);若要改為「給了而為空字串 → `invalid id: string is empty`」屬另一次不相容變更,需主控裁示。
+2. `insert`/`insertBulk`/`save`/`del`/`insertGfs`/`delGfs` 之輸入容器(`data`)為已撤銷或拋錯之物件時,於 wsemi 1.9.69 起視為「無數據」之正常結果(1.9.68 為 reject);包裝物件、數字、字串、`null` 本即如此。
+3. `insert`/`insertBulk`/`save`/`del` 對讀取即拋錯或已撤銷之 `Proxy` 作為 `id`、或 `id` 為會拋錯之自有存取器:於資料複製階段(`cloneData`)reject(既有行為,拋出位置在 `try` 之外故不發 `error` 事件;訊息為該物件所拋之值經 `diag.err`),不走 `chkPk` 訊息但不補值、不寫入、不刪除;`insertGfs`(淺拷貝)對 `Proxy` 值走 `chkPk`、對自有存取器於展開時即 reject(一次 `error` 事件);`delGfs`(不複製)對 `Proxy` 值走 `chkPk`(該筆 `ok:0`)、對自有存取器於取 `id` 時整批 reject。若要求這類值一律走 `chkPk` 詞彙,須於複製之前先取一次 `id`(與「檢查之值即使用之值」之單次讀取設計衝突),屬另案,需主控裁示;現況測試釘住(`api-pk-given` 〈given unreadable id …〉)。
+4. `id` 須為**自有可列舉之資料屬性**(2026-11-19 omg492i 實測,修前即如此,非本次引入):不可列舉之自有 `id`(`Object.defineProperty(o, 'id', { value: 5, enumerable: false })`)被 `cloneDeep` 與淺拷貝丟掉,`insert`/`insertBulk`/`save`/`insertGfs` 視為未帶而補值(`autoGenPk` 關時整批 reject),`del`/`delGfs` 以 `get` 讀得而拒絕;定義於原型上之 `id`(類別存取器、`Object.create({ id: 5 })`),`insertGfs` 之 `{ ...v }` 丟掉而視為未帶,其餘入口(`cloneDeep` 保留原型、`get` 沿原型讀取)讀得而拒絕。另:原型上之存取器若回傳合法字串,`chkPk` 讀得而通過,但 BSON 只序列化自有可列舉屬性而不寫出該欄(「檢查之值即使用之值」只對自有資料屬性成立)。判斷:資料物件之 `id` 慣為自有可列舉資料屬性(物件字面值、`JSON.parse`),不為此另寫程式;若要全入口一致,須於複製前以 `get` 讀 `id`(與單次讀取設計衝突)或 `insertGfs` 改以 `get` 取 `id`/`u8a`,屬另案,需主控裁示。
 
 ## R-DIAG-01 診斷輸出與對外錯誤值之遮罩(依 dspec〈診斷輸出與遮罩〉;2026-10-29 mig-mongo 遷移至 wsemi 共用模組)
 
@@ -224,3 +278,6 @@
    - `opt.logDetail` 為 `true` 之輸出由舊版 `console.log(err)` 裸輸出改為 `console.log(label, 錯誤之遮罩副本)`(多標籤、副本不沿用使用端原型,仍為 stdout);預設輸出與 `funLog` 引數不變。
    - 對外之錯誤值(各函數 reject、`error` 事件之訊息、逐筆 `err`):由「只原地遮罩 `new MongoClient` 解析失敗之錯誤」擴及**全部外來錯誤值**(驅動與後端之錯誤、關閉連線之錯誤、使用端輸入存取器於複製時拋出之值);含憑證者為**同類別之副本**(非同一物件、不原地改寫),不含憑證者為原物件;單獨之帳號不遮(`proxyUsername` 之值被回顯時原樣;`CORP/帳號` 遮為 `***/***`);本套件自身以固定詞彙組成之錯誤(`invalid id/data/find/opt…`)不經遮罩。
    - 不變:各操作 resolve 內容、`change`/`error` 事件 payload 與時機(對照 HEAD golden)。
+4. **2026-11-19 主鍵「給了而不合格」一律拒絕**(R-PKGIVEN-01,omg492i;wsemi 1.9.69 連動;版號由發布流程決定,本次未改 `version`;不保留舊行為):
+   - `insert`/`insertBulk`/`insertGfs`/`save` 之 `id` 為給了而非字串(數字、布林、物件、陣列、`String`/`Number`/`Boolean` 包裝物件、`Symbol`、`BigInt`、`Date`、函式、`Proxy` 等):由「`autoGenPk` 開時靜默換成新 id 寫入;關時 `autoGenPk is false`」改為 `invalid id: not a string at [data[<k>].id]`(`insert`/`insertBulk`/`insertGfs` 整批 reject,`save` 該筆 `ok:0`;不隨 `autoGenPk` 改變)。`save` 於 `autoGenPk:false` 時由整批 reject 改為該筆 `ok:0`。
+   - 不變:未帶(`undefined`/`null`/鍵不存在/`''`)之行為;`del`/`delGfs`/`selectByPk`/`selectByPkGfs`;合法字串 id;`opt.autoGenPk`/`option.returnList` 給非布林值取預設(1.9.69 起 `Boolean` 包裝物件不再被視為布林)。

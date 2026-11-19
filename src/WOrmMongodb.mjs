@@ -30,8 +30,10 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
  * 操作資料庫(MongoDB)
  *
  * 本套件之主鍵欄位固定為id，尚未支援由呼叫端指定。id為無業務語義之識別碼。
- * opt.autoGenPk預設為true，insert、save與insertGfs於輸入未帶有效id時自動產生；del於任一設定下皆不補值。
- * opt.autoGenPk為false時套件一律不產生id，未帶有效id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。
+ * opt.autoGenPk預設為true，insert、insertBulk、save與insertGfs於輸入未帶id(id為undefined、null或空字串)時自動產生；del於任一設定下皆不補值。
+ * 呼叫端給了id而不合格者(非字串，如數字、布林、物件、陣列、String包裝物件、Symbol、BigInt；或含NUL、孤立代理字元)一律拒絕而不補值、不替換(訊息invalid id: 原因 at [data[k].id])，
+ * 因主鍵為資料之身分，給了錯值而換成新id寫入，事後無從對應；此拒絕不隨opt.autoGenPk改變。
+ * opt.autoGenPk為false時套件一律不產生id，未帶id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。
  *
  * 字串良構檢核(w-orm系列一致，不隨opt.autoGenPk改變)：BSON會把孤立代理字元(String.prototype.isWellFormed()為false者)無聲改寫為U+FFFD，
  * 使不同id寫成同一id、鍵名撞鍵、寫入值與讀回值不同，故於到達MongoDB之前檢核並拒收：
@@ -54,7 +56,7 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
  * @param {String} [opt.url='mongodb://127.0.0.1:27017'] 輸入連接資料庫字串，預設'mongodb://127.0.0.1:27017'
  * @param {String} [opt.db='worm'] 輸入使用資料庫名稱字串，預設'worm'
  * @param {String} [opt.cl='test'] 輸入使用資料表名稱字串，預設'test'
- * @param {Boolean} [opt.autoGenPk=true] 輸入是否於輸入未帶有效主鍵時自動產生主鍵值，預設true。為false時主鍵須由呼叫端自備，屬依賴注入之定位，主鍵之唯一性、格式與是否與既有資料衝突皆由呼叫端自負。本設定為建構層設定，不得於insert與save之option逐次覆寫
+ * @param {Boolean} [opt.autoGenPk=true] 輸入是否於輸入未帶主鍵(id為undefined、null、鍵不存在或空字串)時自動產生主鍵值，預設true；給了而不合格之id(如非字串)不論本設定一律拒絕而不補值。非布林值忽略並用預設。為false時主鍵須由呼叫端自備，屬依賴注入之定位，主鍵之唯一性、格式與是否與既有資料衝突皆由呼叫端自負。本設定為建構層設定，不得於insert與save之option逐次覆寫
  * @param {Boolean} [opt.logDetail=false] 輸入是否於console輸出遮罩後之細節，預設false。僅true生效(其他值忽略並用預設，同opt.autoGenPk)；true時change與error訂閱函數拋錯會輸出標籤與該錯誤之遮罩拷貝(含訊息與堆疊，連線憑證以***取代)，可能含資料值與id，僅供除錯
  * @param {Function} [opt.funLog] 輸入診斷輸出函數(label, safe, detail)，預設無。僅函數生效(其他值忽略)；給予時診斷輸出只交給它、不寫console，label為固定標籤，safe為不含個資之摘要，detail為完整細節之遮罩拷貝(連線憑證以***取代，不改動原物件)，供使用端自行遮罩或轉送；其拋錯與回傳之原生promise之reject皆被吞下，不影響操作
  * @returns {Object} 回傳操作資料庫物件，各事件功能詳見說明
@@ -278,8 +280,13 @@ function WOrmMongodb(opt = {}) {
 
     /**
      * 檢查並補齊單筆數據之主鍵
-     * autoGenPk為true時未帶有效id者自動產生，為false時往外拋
-     * 註: 未帶有效id屬呼叫端未履行契約而非某一筆資料本身之問題，故為整批性錯誤而不降級為該筆ok為0，
+     * autoGenPk為true時未帶id者自動產生，為false時往外拋
+     * 註: 僅undefined、null與空字串視為未帶id(空字串為既有文件化之行為，見README)；呼叫端給了其他值(數字、布林、物件、陣列、
+     * String包裝物件、Symbol、BigInt等非字串，或含NUL、孤立代理字元之字串)者為給了而不合格，本函數不補值亦不替換，原樣留給後續chkPk依固定詞彙拒絕，
+     * 因主鍵為資料之身分，呼叫端給了錯值卻換成新id寫入，事後無從對應
+     * 註: 判定不得改用isestr等語意可隨wsemi版本改變之判斷函數(wsemi 1.9.69起isestr不收String包裝物件，原寫法即因此把包裝物件靜默換成新id)，
+     * 一律以===比對，且不呼叫被檢測值之任何方法或陷阱
+     * 註: 未帶id屬呼叫端未履行契約而非某一筆資料本身之問題，故為整批性錯誤而不降級為該筆ok為0，
      * 若降級為逐筆結果，呼叫端易於整批resolve之下漏看，使[忘了給id]靜默變成[少寫了幾筆]
      * 註: 本函數須於任何寫入之前一次對全部數據完成，令拋錯時同批之有效筆數亦不會被寫入
      *
@@ -290,8 +297,11 @@ function WOrmMongodb(opt = {}) {
      */
     function procPk(v, k) {
 
-        //check
-        if (!isestr(v.id)) {
+        //id, 僅取一次
+        let id = v.id
+
+        //check, 僅undefined、null與空字串為未帶id
+        if (id === undefined || id === null || id === '') {
 
             //check, autoGenPk為false時主鍵須由呼叫端自備
             if (!autoGenPk) {
@@ -661,14 +671,15 @@ function WOrmMongodb(opt = {}) {
      * 註: 預設回傳單一聚合物件，n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
      * 註: option.returnList為true時改回與輸入等長且保序之逐筆陣列，供呼叫端得知[是哪幾筆]為新數據，
      * 聚合計數僅能回答[有幾筆]，而去重類呼叫端須知何者為新方能對其執行下游動作
-     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
+     * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
      * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，
      * 訊息為invalid id: 原因 at [data[k].id]或invalid data: 原因 at [data[k].路徑]，以索引最小之不合格筆為準，不回顯值，error事件於reject前發出一次
      *
      * @memberOf WOrmMongodb
      * @param {Object|Array} data 輸入數據物件或陣列
      * @param {Object} [option={}] 輸入設定物件，預設為{}
-     * @param {Boolean} [option.returnList=false] 輸入是否改回逐筆結果陣列，預設為false。為true時回傳與輸入等長且保序之陣列，各元素為{ n, nInserted, ok }，已插入者nInserted為1、已存在而跳過者為0
+     * @param {Boolean} [option.returnList=false] 輸入是否改回逐筆結果陣列，預設為false，非布林值(含Boolean包裝物件)忽略並用預設。為true時回傳與輸入等長且保序之陣列，各元素為{ n, nInserted, ok }，已插入者nInserted為1、已存在而跳過者為0
      * @returns {Promise} 回傳Promise，resolve回傳插入結果，returnList為true時回傳逐筆結果陣列，reject回傳錯誤訊息
      */
     async function insert(data, option = {}) {
@@ -921,7 +932,8 @@ function WOrmMongodb(opt = {}) {
      * 註: 本函數非insert之加速版，兩者衝突政策不同——insert跳過已存在者而整批ok為1，
      * 本函數則整批reject；需要逐筆處置者改用insert
      * 註: n為輸入筆數，nInserted於成功時恆等於n；不提供逐筆結果，故不出現ok為0與err
-     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
+     * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
      * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，訊息格式同insert
      * 註: 全有全無之達成方式依部署而異——具replica set或分片叢集者以交易包覆，
      * standalone無交易可用而以補償動作達成，其限制詳見_insertBulkByCompensate
@@ -1162,7 +1174,8 @@ function WOrmMongodb(opt = {}) {
      * 儲存數據，以id為準更新既有數據，未給之欄位會保留；id不存在且option.autoInsert為true時改為插入
      * 註: n為id命中筆數，命中或經插入而產生皆為1；[內容相同]之判定基準為將待儲存物件合併進現值後結果與現值相同，
      * 相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報
-     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
+     * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(該筆以ok為0並附err: invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
      * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，該筆以ok為0並附err(invalid id: …或invalid data: …，不回顯值)回報，
      * 不送往伺服器，每筆一次error事件，同批其他筆照常；同批皆不合格時不連線
      *
@@ -1199,7 +1212,7 @@ function WOrmMongodb(opt = {}) {
             }
 
             //check id與data, 須先於建立client與任何寫入且於已複製之數據上一次完成;
-            //未帶有效id(autoGenPk為false)屬整批性錯誤而往外拋, 主鍵或資料不合格者僅該筆失敗(msgBads[k]), 同批其他筆照常
+            //未帶id(autoGenPk為false)屬整批性錯誤而往外拋, 給了而不合格(含非字串)之主鍵或資料不合格者僅該筆失敗(msgBads[k]), 同批其他筆照常
             let msgBads = {}
             data = map(data, function(v, k) {
                 v = procPk(v, k)
@@ -1517,7 +1530,8 @@ function WOrmMongodb(opt = {}) {
      * 使用GridFS，插入數據，僅於id不存在時寫入，已存在者跳過且不覆寫
      * 數據物件形狀為{ id, u8a }，u8a須為Uint8Array
      * 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
-     * 註: opt.autoGenPk為true(預設)時未帶有效id者自動產生，為false時未帶有效id即reject且同批皆不寫入
+     * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
+     * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
      * 註: 主鍵id含孤立代理字元或NUL者於連線與寫入之前整批reject且同批皆不寫入(訊息invalid id: 原因 at [data[k].id]，不回顯值)；
      * 本函數僅寫入id(檔名)與u8a(位元組)，其餘欄位不寫入故不檢核
      *

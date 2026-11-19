@@ -14,6 +14,12 @@
 | 基本操作、事件(`change`/`error`)、`autoGenPk`、GridFS、跨行程併發 | (README) | `api-basic`、`api-gfs`、`api-insertbulk-rs` | 完成 |
 | **診斷輸出與對外錯誤值之遮罩(遷移至 wsemi 共用模組,mig-mongo)** | R-DIAG-01(依 dspec〈診斷輸出與遮罩〉) | `unit-diagwire`、`unit-diaglog`、`unit-urlerr`、`api-diaglog` | 完成(見下) |
 | **連線於操作空檔被中斷,行程不終止(第 209 項,查證結論:不屬實,`src` 未改)** | R-CLIENTERR-01 | `api-clienterr`(+`test/tools/clientErrScenario.mjs`) | 完成(見下) |
+| **主鍵「未帶」與「給了而不合格」之分界(2026-11-19 omg492i;wsemi 1.9.69 連動修正)**:只有 `undefined`、`null`、`''` 視為未帶(`autoGenPk` 開自動產生/關整批 reject);給了而非字串(數字、布林、物件、陣列、包裝物件、`Symbol`、`BigInt`、`Proxy` 等)一律 `invalid id: not a string`,不補值、不隨 `autoGenPk` 改變 | R-PKGIVEN-01 | `api-pk-given`(245 案)、`api-wellformed`(〈String 包裝物件之 id 應 reject〉) | 完成(見下) |
+
+### R-PKGIVEN-01 主鍵「給了而不合格」(2026-11-19,omg492i)
+
+- 修正:`src/WOrmMongodb.mjs` `procPk` 由 `!isestr(v.id)` 改為 `=== undefined || null || ''`(`v.id` 只取一次);其餘入口(`chkPk`、`del`、`delGfs`、`selectByPk`、`selectByPkGfs`)程式未改,以測試釘住。不相容變更(`insert({ id: 5 })` 由靜默換新 id 寫入改為拒絕;`save` 於 `autoGenPk:false` 對非字串 id 由整批 reject 改為該筆 `ok:0`),README〈破壞性變更〉、JSDoc、帳本 R-PKGIVEN-01 與〈破壞性變更紀錄〉第 4 項已同步;`version` 未改。
+- 已知缺口/待辦(待主控裁示):①`id: ''` 於 `autoGenPk:true` 仍視為未帶而自動產生(README 既有行為,`api-basic` 案釘住),是否改為拒絕 `string is empty` 屬另一次不相容變更;②資料容器(`data`)為已撤銷或 `Symbol.toStringTag` 拋錯之物件時,wsemi 1.9.69 起視為「無數據」正常結果(1.9.68 為 reject),未改(與 `insert(5)`、`insert(null)` 同為既有「非容器 → 無數據」設計)。
 
 ### R-CLIENTERR-01 連線空檔中斷(2026-10-31,第 209 項)
 

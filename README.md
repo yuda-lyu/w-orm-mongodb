@@ -10,6 +10,22 @@ An operator for mongodb in nodejs.
 
 ## 破壞性變更
 
+### 給了而不合格之主鍵(`id`)一律拒絕，不再靜默替換為新`id`(詳見下方「Primary key」)
+
+主鍵為資料之身分，呼叫端給了錯值卻被換成新`id`寫入，事後無從對應。本版起，**只有**`id`為`undefined`、`null`(含鍵不存在)與空字串(既有文件化之行為)視為「未帶主鍵」，其餘一律視為「給了」；給了而非字串(數字、布林、物件、陣列、`String`包裝物件、`Symbol`、`BigInt`等)者**拒絕**，不補值、不替換，不設過渡期：
+
+| 項目 | 原行為 | 現行為 |
+|---|---|---|
+| `insert`、`insertBulk`、`insertGfs`、`save`之`id`為數字、布林、物件、陣列、`Symbol`、`BigInt`、`Date`、函式等非字串，且`autoGenPk`為`true` | 視為未帶而自動產生新`id`並寫入(如`insert({ id: 5 })`寫入的是新產生之`id`，原值消失) | `insert`、`insertBulk`、`insertGfs`整批`reject`且不寫入任何一筆；`save`該筆`ok: 0`附`err`，同批其他筆照常。訊息皆為`invalid id: not a string at [data[<k>].id]`(固定詞彙、不回顯值) |
+| 同上，且`autoGenPk`為`false` | `reject`：`invalid data[<k>].id, autoGenPk is false`(`save`亦同，整批) | 同上列(依主鍵檢核拒絕，不隨`autoGenPk`改變)；`save`改為該筆`ok: 0`附`err`，不再整批`reject` |
+| `String`包裝物件(`new String('a')`)作為`id` | 舊版即拒收(`invalid id: not a string …`)；wsemi 1.9.69起其判斷函數不收包裝物件，以其判定「未帶」之套件改為把它靜默換成新`id`寫入 | 拒收(`invalid id: not a string …`)，與舊版一致 |
+| `insertGfs`之`id`為讀取即拋錯或已撤銷之`Proxy` | 同上，被換成新`id` | `reject`：`invalid id: not a string …` |
+| `id`為`undefined`、`null`、鍵不存在、空字串 | `autoGenPk`為`true`自動產生；為`false`整批`reject`(`invalid data[<k>].id, autoGenPk is false`) | 不變 |
+| `del`、`delGfs`、`selectByPk`、`selectByPkGfs`之`id`/`pk`為非字串 | 該筆`ok: 0`附`err`；`selectByPk`、`selectByPkGfs`回`null` | 不變 |
+| `opt.autoGenPk`、`insert`之`option.returnList`給了非布林值(含`Boolean`包裝物件) | 部分以包裝物件之真假值生效(如`new Boolean(false)`視為真) | 非布林值一律忽略並用預設(`autoGenPk`為`true`、`returnList`為`false`)，不拒絕 |
+
+`insert`、`insertBulk`、`save`、`del`對「讀取即拋錯或已撤銷之`Proxy`」作為`id`者(或`id`為會拋錯之存取器)，於資料複製階段即以該物件所拋之錯誤`reject`(既有行為，不發`error`事件，不走`invalid id`詞彙)，同樣不補值、不寫入、不刪除。
+
 ### 字串良構檢核(`w-orm-*`系列一致，詳見下方「字串良構檢核」)
 
 MongoDB的BSON會把孤立代理字元(UTF-16代理對被拆開後只剩一半，`String.prototype.isWellFormed()`為`false`者)無聲改寫為`U+FFFD`，使不同的`id`寫成同一個`id`(`insert`誤判已存在、`save`覆寫他筆、`del`誤刪他筆、`selectByPk`命中他筆)，文件內不同鍵名撞成同一鍵(值被覆蓋)，寫入值與讀回值不同。本版起於到達MongoDB之前檢核並拒收，不設過渡期：
@@ -466,14 +482,16 @@ wo.on('error', function(mode, data, err) {
 
 | `opt.autoGenPk` | 行為 |
 |---|---|
-| `true`（預設） | `insert`、`save`、`insertGfs`於輸入未帶有效`id`時，由套件以`genIDSeq()`自動產生（UUIDv7，時間有序） |
+| `true`（預設） | `insert`、`insertBulk`、`save`、`insertGfs`於輸入未帶`id`(`id`為`undefined`、`null`、鍵不存在或空字串)時，由套件以`genIDSeq()`自動產生（UUIDv7，時間有序） |
 | `false` | 套件一律不產生`id`，`id`須由呼叫端於寫入前自備 |
 
 `autoGenPk: false`之定位為**依賴注入**：`id`的產生規則改由呼叫端掌握（如採用外部發號器、以業務欄位組合、沿用上游系統既有識別碼），套件不介入。採用此設定後，**`id`之唯一性、格式與是否與既有資料衝突，皆由呼叫端自負**。
 
 `autoGenPk`為建構層設定，**不得於`insert`與`save`之`option`逐次覆寫**——主鍵由誰產生是整個資料表的政策，若逐次可改，同一資料表將混入兩種來源之`id`而難以追溯。
 
-`autoGenPk: false`而輸入未帶有效`id`時，以`Promise.reject`拋出，屬整批性錯誤而不進入逐筆結果。主鍵檢查於任何寫入之前一次完成，故整批`reject`時**同批之有效筆數亦不會被寫入**。
+`autoGenPk: false`而輸入未帶`id`時，以`Promise.reject`拋出，屬整批性錯誤而不進入逐筆結果。主鍵檢查於任何寫入之前一次完成，故整批`reject`時**同批之有效筆數亦不會被寫入**。
+
+**給了`id`而不合格者一律拒絕，不補值、不替換，且不隨`autoGenPk`改變**：只有`undefined`、`null`(含鍵不存在)與空字串視為未帶；給了而非字串(數字、布林、物件、陣列、`String`包裝物件、`Symbol`、`BigInt`、`Date`、函式等)、或為含NUL、孤立代理字元之字串者，依「字串良構檢核」拒絕(`invalid id: <原因> at [data[<k>].id]`，不回顯值)，通道同該入口既有之主鍵檢核：`insert`、`insertBulk`、`insertGfs`整批`reject`，`save`該筆`ok: 0`附`err`。理由：主鍵為資料之身分，呼叫端給了錯值卻換成新`id`寫入，事後無從對應。
 
 `del`不受`autoGenPk`影響，於任一設定下皆不補值——未帶有效`id`者視為該筆無法處理，回`ok: 0`並附`err`。
 
@@ -513,8 +531,8 @@ BSON以UTF-8存放字串，**孤立代理字元**(高代理後無低代理，或
 ```alias
 invalid id: string contains lone surrogate at [data[1].id]
 invalid id: string contains NUL at [data[1].id]
-invalid id: not a string at [data[1].id]            // del、delGfs：非字串；insert、insertBulk、insertGfs、save：String包裝物件(其餘非字串依autoGenPk補值或拒收，見上)
-invalid id: string is empty at [data[1].id]            // del、delGfs：空字串(insert、save於autoGenPk為true時會自動產生id)
+invalid id: not a string at [data[1].id]            // 給了而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)，所有收主鍵之寫入與刪除入口皆同，不隨autoGenPk改變、不補值
+invalid id: string is empty at [data[1].id]            // del、delGfs：空字串(insert、insertBulk、save、insertGfs於autoGenPk為true時視為未帶而自動產生id)
 invalid data: string contains lone surrogate at [data[1].meta.tags[0]]
 invalid opt.cl: string contains lone surrogate
 ```
@@ -525,6 +543,7 @@ invalid opt.cl: string contains lone surrogate
 
 ### 已知限制
 
+- 輸入數據之`id`須為**自有可列舉之資料屬性**。`id`為不可列舉之自有屬性時，`insert`、`insertBulk`、`save`、`insertGfs`於複製後讀不到它而視為未帶(`autoGenPk`為`true`時自動產生、為`false`時`reject`)，`del`、`delGfs`則讀得其值而依主鍵檢核拒絕；`id`定義於原型上(如類別之存取器)時，`insertGfs`(淺拷貝)視為未帶，其餘入口讀得其值而依主鍵檢核拒絕。MongoDB驅動亦只序列化自有可列舉屬性，一般之資料物件(物件字面值、`JSON.parse`之結果)不受影響。
 - `insertGfs`只寫入`id`(檔名)與`u8a`(內容為位元組)，其餘欄位不寫入，故不檢核資料之其他欄位；`u8a`內容不屬字串。
 - `String`包裝物件(`new String(...)`)作為**資料值**時，其字串值受檢核，但BSON以字元索引存成子文件，成對代理會被拆成孤立碼元，本套件不解包、不改存放形式；實務上資料不會使用`String`包裝物件。
 - 自訂`toJSON`/序列化函式之輸出不在檢核範圍。

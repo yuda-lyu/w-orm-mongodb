@@ -100,7 +100,7 @@
 
 ### 其他陷阱
 
-- `isestr(new String('a'))` 為 true(wsemi `isstr` 以 `Object.prototype.toString` 判型),但 BSON 把 `String` 包裝物件以字元索引存成子文件(`{0:'a'}`),`selectByPk('a')` 查不到.主鍵檢核須以 `chkOrmStr`(`typeof === 'string'`)為準,不能只靠 `isestr`.
+- `isestr(new String('a'))` 在 wsemi 1.9.68 以前為 true(`isstr` 以 `Object.prototype.toString` 判型),1.9.69 起為 false(`typeof`,使用者 2026-11-16 W-20);但 BSON 把 `String` 包裝物件以字元索引存成子文件(`{0:'a'}`),`selectByPk('a')` 查不到.主鍵檢核須以 `chkOrmStr`(`typeof === 'string'`)為準,不能只靠 `isestr`;**「未帶」之判定亦不得用 `isestr`**(見下〈2026-11-19 主鍵「未帶」與「給了而不合格」〉).
 - `pmSeries` 回呼第二參數是批次索引(陣列時為數字);`save`/`del`/`delGfs` 用它對應 `msgBads[k]`、`ids[k]`.
 - 變異與審查副本均不可 `cd`;用 `node tmp/...` 與絕對路徑.在 Bash 工具內用 `node -e "…"` 帶反斜線或反引號的程式碼會被 shell 與工具各吃一層轉義(實際發生過:`\\u0000` 變成真的 NUL 字元寫進檔案、`` `${cl}.chunks` `` 被當成命令替換),**一律用 Write 工具寫成 `.mjs` 檔再執行**,要產生反斜線字元用 `String.fromCharCode(92)`.
 - 外審(2026-10-20):sol 於 22:38 回 `You've hit your usage limit … try again at Oct 21st, 2026 12:40 AM`;`quota-agy` 顯示 Argon 與 Claude/GPT 組皆 100%,實派 Argon、agy-opus 各一行探測皆 exit 3、`RESOURCE_EXHAUSTED (code 429) … Individual quota reached`(約 10 秒內結束,不需等 5 分鐘);agy `gemini-3.8-flash-high` 通過探測,正式審查 872 秒完成.minimax(`opencode/minimax-m3.1-flash-free` `--variant xhigh`)探測 72 秒、正式審查 693 秒完成;其環境無 `rg`,自行改用 `ls`/`grep`/read 工具.審查副本放 `tmp/review/{repo,ref}`(不複製 `node_modules`,node 往上層解析),`tmp/review/prep.mjs` 重建、`dispatch-one.mjs <sol|minimax|argon|agyopus|agyflash> <probe|run>` 派工.
@@ -138,3 +138,12 @@
 - 審查者副本放 `tmp/review/{repo,ref}`,位於 repo 之下,node 能往上找到 `node_modules`,不需連接點.副本內「依賴注入」「繞過」「1=1」「不可信」等字樣先中性化(只改副本).提示詞用「功能正確性」措辭,並明寫不得啟動 docker/不得跑 mocha(固定容器名會與進行中之工作衝突).
 - 三家能力探測皆通過(讀第 1 行、於自己輸出目錄建檔):opus 9 秒、sol 15 秒、beam 12 秒;beam 環境無 `rg`(`command not found`)但自行改用其他讀法.
 - 正式派工以 `tmp/review/dispatch-one.mjs <opus|sol|beam>` 由 `nohup … &` detached 啟動,`timeoutMs` 3600000;不要在 Bash 工具內用複合指令 `cd` 後留在別的目錄——**複合指令中的 `cd ..` 會持久改變後續呼叫之工作目錄**(本次發生一次,以絕對路徑與再 `cd` 回 repo 根修復),一律用絕對路徑.
+
+## 2026-11-19 主鍵「未帶」與「給了而不合格」(R-PKGIVEN-01,omg492i)
+
+- **形狀**:依賴 wsemi 判斷函數之布林結果來決定「補值」這種**有副作用之分支**,函式庫升版使「給了而不合格」之值落入「未帶」分支,被靜默換成新 id 寫入;全套之測試只釘「拒收」,不釘「不得補值」,故連動升版後僅 1 案紅(`api-wellformed` 〈String 包裝物件之 id 應 reject〉)而其餘非字串(數字、布林、物件、`Proxy`)之靜默替換早在升版前就存在、無測試可抓.判定「未帶」只用 `=== undefined`/`null`/`''`,補值與拒絕用同一個變數(只取一次 `v.id`).
+- **盤點法**:對同一份舊 src(`git archive HEAD src` 解到 `tmp/<名>/old-src/`)分別接 wsemi 1.9.68(`npm pack wsemi@1.9.68` 解到 `tmp/<名>/w68/node_modules/wsemi`,`src` 複本置其下,其餘相依由往上層解析到 repo 之 `node_modules`)與 1.9.69 跑同一支探測(入口 × 值類別 × `autoGenPk`),差異格即「僅因 wsemi 升版而改變」者;再以新 src 跑同探測得「因本修正而改變」者.298 格(8 入口 × 25 類)+80 格(資料容器與執行參數)約各 15–30 秒.
+- **wsemi 1.9.68→1.9.69 之實測差異**(僅對本庫之呼叫站點):`isestr/isstr/isnbr/isbol` 由 `Object.prototype.toString`/lodash 改 `typeof`(包裝物件不再是字串、數字、布林);`isobj/isarr/isu8arr` 之標籤判定包 `try`(已撤銷或 `Symbol.toStringTag` 拋錯之物件由「拋錯」變「非該型」),故 `insert(revokedProxy)` 等由 reject 變 `{ n: 0, nInserted: 0, ok: 1 }`(無數據之正常結果,已知限制,見帳本).
+- **`Proxy` 值作為 `id`**:`insert`/`insertBulk`/`save`/`del` 於 `cloneData`(`cloneDeep`)即拋(`diag.err` 後 reject,不發 `error` 事件);`insertGfs`(淺拷貝)與 `delGfs`(不複製)走到 `chkPk`.測試構造:`new Proxy({}, new Proxy({}, { get: () => () => { throw … } }))`(所有陷阱拋錯)與 `Proxy.revocable` 後 `revoke()`.
+- **`id: ''` 為既有文件化之「未帶」**(README 訊息表與 `api-basic` 之 id 為空字串案,`autoGenPk:true` 時自動產生),本次**未改**;主控之規則句「只有 undefined、null 視為未帶」未列空字串,依「上列以外之行為不變」保留,列需裁示(帳本已知限制 1).
+- 測試檔 214 案約 17 秒(拒收發生於連線之前,不需連 MongoDB),可單檔反覆跑;變異以 `tmp/omg492i/mutrun.mjs` 一次性腳本執行(每案約 15–25 秒,含起容器),`WORM_PK_CT` 環境變數換容器名.
