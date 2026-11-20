@@ -2,7 +2,7 @@
 
 本檔記當前已開發功能之最新狀態(各功能做到哪裡、對應之規則帳本條目與測試檔、已知缺口與待辦、最近一次驗證或發布之版本),只記現況、不寫過程(過程見 `sgud/exp/experience.md`)。藍圖(規則)見 `sgud/rule/rulebook.md`(R-DIAG-01 之細節見 `sgud/rule/rulebook_diag.md`)。
 
-- 套件版本:`package.json` 1.2.40(2026-11-20 第 557 項 oro557d 未改 `version`;發布由使用者/主控負責)。相依:`wsemi` ^1.9.70(診斷輸出與遮罩、字串良構檢核、`chkReadable` 可讀性探針之共用模組;2026-11-20 起新引用 `wsemi/src/chkReadable.mjs`、`wsemi/src/isobj.mjs`)、`mongodb` ^7.8.0(非自有套件)。
+- 套件版本:`package.json` 1.2.42(2026-11-20 第 569 項 omg569 未改 `version`;發布由使用者/主控負責)。相依:`wsemi` ^1.9.70(診斷輸出與遮罩、字串良構檢核、`chkReadable` 可讀性探針之共用模組;2026-11-20 起新引用 `wsemi/src/chkReadable.mjs`、`wsemi/src/isobj.mjs`)、`mongodb` ^7.9.0(非自有套件)。
 - 本檔於 2026-10-28(mongo-run01)首次建立;更早之功能現況請以 `sgud/rule/rulebook.md` 之 R-FIND-01、R-ORMSTR-01 與〈破壞性變更紀錄〉為準。
 
 ## 功能現況
@@ -16,6 +16,13 @@
 | **連線於操作空檔被中斷,行程不終止(第 209 項,查證結論:不屬實,`src` 未改)** | R-CLIENTERR-01 | `api-clienterr`(+`test/tools/clientErrScenario.mjs`) | 完成(見下) |
 | **主鍵「未帶」與「給了而不合格」之分界(2026-11-19 omg492i;wsemi 1.9.69 連動修正)**:只有 `undefined`、`null`、`''` 視為未帶(`autoGenPk` 開自動產生/關整批 reject);給了而非字串(數字、布林、物件、陣列、包裝物件、`Symbol`、`BigInt`、`Proxy` 等)一律 `invalid id: not a string`,不補值、不隨 `autoGenPk` 改變 | R-PKGIVEN-01 | `api-pk-given`(247 案;oro557d3 將 `selectByPk`/`selectByPkGfs` 之不可讀 `pk` 兩案由「回 `null`」改為 reject,各拆為 2 入口)、`api-wellformed`(〈String 包裝物件之 id 應 reject〉) | 完成(見下) |
 | **讀取即拋錯(不可讀)之輸入依原失敗通道拒絕,改用 wsemi `chkReadable`(2026-11-20 oro557d、oro557d3,第 557 項)**:6 個收資料容器之入口之 `data`、`insert`/`save` 之 `option` 與 `option.returnList`/`option.autoInsert`、`insertGfs` 之 `u8a`、`selectByPk`/`selectByPkGfs` 之 `pk`、建構 `opt`/`opt.autoGenPk`/`opt.url`/`opt.db`/`opt.cl` 為不可讀者,整批 reject(`error` 事件恰一次)或建構同步 throw,固定詞彙 `invalid <名稱>: must be a readable value`;容器可讀而成員為拋錯之存取器者亦轉固定詞彙(讀取處見帳本);可讀而型別不符者不變(`pk` 為 `5`、包裝物件等仍回 `null`) | R-READABLE-01 | `api-readable`(825 案;含 S9 之 A1~A6 逐代號)、`api-pk-given`(247 案)、`unit-diagwire`(97 案;`new Error(` 計數 3) | 完成(見下;2026-11-20 oro557d4 起複製階段之巢狀不可讀值亦轉固定詞彙,A3、A4) |
+| **主鍵只認自有可列舉之資料屬性(2026-11-20 omg569,第 569 項全族)**:列之 `id` 為繼承(原型鏈上,不論值之型別)或自有不可列舉者視為未帶:`insert`/`insertBulk`/`save` 於 `autoGenPk` 開補新 `id`(`Object.defineProperty` 設為自有可列舉資料屬性)、關整批 reject `invalid data[<k>].id, autoGenPk is false`;`del`/`delGfs` 該筆 `ok:0` `invalid id: not a string`,不刪除庫內同值之列/檔案;`insertGfs` 修前即合規 | R-PKOWN-01 | `api-pk-own`(408 案) | 完成(見下) |
+
+### R-PKOWN-01 主鍵只認自有可列舉之資料屬性(2026-11-20,omg569,第 569 項)
+
+- 實作(`src/WOrmMongodb.mjs`):`isOwnPk(v)`(`Object.prototype.propertyIsEnumerable.call(v, 'id')`,不呼叫 getter)、`setPk(v, id)`(物件之列一律 `defineProperty`,非物件之列賦值)、`getDelPk(v)`(`get` 取值,有效字串才查 `isOwnPk`,繼承者回 `undefined`)、`procPk`(`id` 為未帶或 `!isOwnPk(v)` → 補值/整批 reject)、`del`/`delGfs` 之取值改 `getDelPk`。判定先取值、值為未帶即短路,只有值為給了才查描述子。站點全集、修前/修後與盤點指令見帳本 R-PKOWN-01。
+- 不相容變更(README〈破壞性變更〉、JSDoc、帳本〈破壞性變更紀錄〉第 6 項已同步;`version` 未改):見上表列。
+- 已知缺口/待辦(待主控裁示,見帳本 R-PKOWN-01 已知限制):①自有可列舉 `id` 而原型上有 frozen/僅 getter 之同名 `id` 時 `cloneDeep` 拋 `TypeError`(修前即有,`insert`/`insertBulk`/`save`/`del` 整批 reject `invalid data: must be a readable value`,`insertGfs`/`delGfs` 正常),非本規則所引入,未改;②`delGfs` 之 `Proxy` 列僅以 `get` 陷阱虛擬 `id` 者視為未帶。
 
 ### R-PKGIVEN-01 主鍵「給了而不合格」(2026-11-19,omg492i)
 
@@ -51,6 +58,8 @@
   6. 下游:凡以含憑證之 reject 做 `===` 身分比較、或依賴 `logDetail` 裸輸出格式者受影響;依賴本套件之 `w-orm-*` 上層(如 w-serv-orm 之 mongo 後端)請留意 reject 副本與單獨帳號不遮。
 
 ## 最近一次驗證
+
+- 2026-11-20 第 569 項 omg569(主鍵只認自有可列舉之資料屬性,未發布;`version` 未改):全套 `npm test`(`quiet-run --lock`)**5593 passing / 0 failing / 0 pending**(13m,exit 0;較 oro557d4 之 5185 增 408 案,皆為 `api-pk-own`)。`api-pk-own`(408 案,單檔約 2 分鐘)修前(`git archive HEAD src`)142 紅/266 綠、修後 408 綠;探針 288 格(入口 6 × 形狀 12 × seed 2 × `autoGenPk` 2)修前/修後 120 格不同、168 格相同;變異 22 項(含 M18 雙重)中 20 項轉紅、2 項等價存活(`insertGfs` 兩道防線之一單獨移除);eslint 對 `src/WOrmMongodb.mjs`、`test/api-pk-own.test.mjs` 0 錯誤;`audit-own-pkg` 必修 0、待判讀 0;sonnet 唯讀複審 1 項採納(`setPk` 不查描述子)、測試補強 3 處、規則外既有缺陷 1 項(帳本 R-PKOWN-01 已知限制 4,待主控裁示)(`C:\opensrcOper\dnow\20261120123046\agent-out\omg569-修正報告.md`、`omg569-evidence\`)。
 
 - 2026-11-20 第 557 項 oro557d4(全族對齊輪 A1~A6,未發布;`version` 未改):全套 `npm test`(`quiet-run --lock`)**5185 passing / 0 failing / 0 pending**(12m22s,exit 0;較 oro557d3 之 4808 增 377 案:`api-readable` 452 → 825、`unit-diagwire` 93 → 97、`api-pk-given` 247 不變)。修前(oro557d3 交件版 `src` + 本輪 3 個測試檔)1169 案 859 綠/310 紅、修後 1169 綠;探針 724 格修前/修後 316 格不同(皆 A3、A4)、408 格相同(A1、A2、A5、A6 與 A4 頂層修前已合)。變異新增 21 項(A3 15、A4 4、`u8a` 標籤 2)、前兩輪 51 項重跑、`diagMutRun` 53 項,共 125 項全轉紅;1 項等價變異預期存活。eslint 對 `src/WOrmMongodb.mjs`、`test/api-readable.test.mjs`、`test/api-pk-given.test.mjs` 0 錯誤(`unit-diagwire` 16、`diagMutRun` 4 為 HEAD 既有);`audit-own-pkg` 必修 0、待判讀 0;sonnet 唯讀複審 1 中(`u8a` 標籤多讀,已修)1 工具(`diagMutRun` 變異失效,已修)3 註解(已修)(`C:\opensrcOper\dnow\20261120043625\agent-out\oro557d4-修正報告.md`、`oro557d4-evidence\`)。
 

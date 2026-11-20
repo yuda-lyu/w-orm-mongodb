@@ -199,7 +199,57 @@
 1. 空字串(`''`)作為 `id` 於 `autoGenPk:true` 時仍視為「未帶」而自動產生(README 既有文件化行為,`api-basic` 既有案釘住);若要改為「給了而為空字串 → `invalid id: string is empty`」屬另一次不相容變更,需主控裁示。
 2. (**已解除**,2026-11-20 oro557d,見 R-READABLE-01)原:`insert`/`insertBulk`/`save`/`del`/`insertGfs`/`delGfs` 之輸入容器(`data`)為已撤銷或拋錯之物件時,於 wsemi 1.9.69 起視為「無數據」之正常結果(1.9.68 為 reject);現改為整批 reject `invalid data: must be a readable value`,包裝物件、數字、字串、`null` 等可讀而型別不符者維持「無數據」。
 3. (**已解除**,2026-11-20 oro557d4,第 557 項全族對齊輪 A3,見 R-READABLE-01 規則句 10)原:`insert`/`insertBulk`/`save`/`del` 對讀取即拋錯或已撤銷之 `Proxy` 作為 `id`、或 `id` 為會拋錯之自有存取器,於資料複製階段(`cloneData`)reject 該物件所拋之原例外(不發 `error` 事件);`insertGfs` 對 `Proxy` 值為 `invalid id: not a string`、對自有存取器為原例外;`delGfs` 對 `Proxy` 值為該筆 `ok:0`、對自有存取器為原例外。**現行**:6 個入口一律走與頂層不可讀相同之通道——整批 reject 固定詞彙 `invalid data: must be a readable value`(不含原例外文字,`error` 事件恰一次、數據參數 `null`,不補值、不連線、不寫入、不刪除);`insertGfs`/`delGfs` 之 `id` 為不可讀之值(非自有存取器)於「`id` 給了而非字串」之分支內探針(`isUnreadable(id)`),未改動「檢查之值即使用之值」之單次讀取設計;可讀而非字串者仍 `invalid id: not a string`(測試 `api-pk-given` 〈given unreadable id …〉改釘)。
-4. `id` 須為**自有可列舉之資料屬性**(2026-11-19 omg492i 實測,修前即如此,非本次引入):不可列舉之自有 `id`(`Object.defineProperty(o, 'id', { value: 5, enumerable: false })`)被 `cloneDeep` 與淺拷貝丟掉,`insert`/`insertBulk`/`save`/`insertGfs` 視為未帶而補值(`autoGenPk` 關時整批 reject),`del`/`delGfs` 以 `get` 讀得而拒絕;定義於原型上之 `id`(類別存取器、`Object.create({ id: 5 })`),`insertGfs` 之 `{ ...v }` 丟掉而視為未帶,其餘入口(`cloneDeep` 保留原型、`get` 沿原型讀取)讀得而拒絕。另:原型上之存取器若回傳合法字串,`chkPk` 讀得而通過,但 BSON 只序列化自有可列舉屬性而不寫出該欄(「檢查之值即使用之值」只對自有資料屬性成立)。判斷:資料物件之 `id` 慣為自有可列舉資料屬性(物件字面值、`JSON.parse`),不為此另寫程式;若要全入口一致,須於複製前以 `get` 讀 `id`(與單次讀取設計衝突)或 `insertGfs` 改以 `get` 取 `id`/`u8a`,屬另案,需主控裁示。
+4. (**已解除**,2026-11-20 omg569,第 569 項,見 R-PKOWN-01)原:`id` 須為**自有可列舉之資料屬性**(2026-11-19 omg492i 實測,修前即如此,非 omg492i 引入):不可列舉之自有 `id` 被 `cloneDeep` 與淺拷貝丟掉而視為未帶,`del`/`delGfs` 以 `get` 讀得而拒絕;定義於原型上之 `id`,`insertGfs` 之 `{ ...v }` 丟掉而視為未帶,其餘入口讀得其值(原型上為字串者寫入無 `id` 欄之列、`save` 以其覆寫或新增同值之列、`del`/`delGfs` 刪除同值之列;非字串者拒絕)。**現行**:繼承者與自有不可列舉者全入口一律視為未帶(R-PKOWN-01)。
+
+## R-PKOWN-01 主鍵只認自有可列舉之資料屬性,繼承者視為未帶(2026-11-20,omg569,排程第 569 項全族;依 w-serv-orm R-OBJ-01 規則 7 ①與共同規則一)
+
+**成因**:`cloneDeep` 保留原型、只複製自有可列舉鍵;`procPk` 以 `v.id` 讀得原型上之值而判「已帶」,而 BSON 只序列化自有可列舉之屬性。`del`/`delGfs`(`delGfs` 不複製)以 `get(v, 'id')` 沿原型讀得其值。實測(真 MongoDB 容器 `mongo:8`,standalone,入口 6 × 形狀 12 × 有無同值既有列 2 × `autoGenPk` 2 = 288 格):繼承字串 → `insert`/`insertBulk` 寫入**無 `id` 欄**之列(`resolve` 成功,與庫內同值之列不衝突)、`save` 以繼承值為查詢條件**覆寫同值之既有列**(`nModified:1`)或以該值新增、`del`/`delGfs` **刪除庫內同值之列/檔案**;繼承非字串(數字、物件)→ 既有拒絕(`invalid id: not a string`);`insertGfs` 因 `{ ...v }` 只展開自有可列舉屬性而修前即合規。
+
+**規則句**
+
+1. **主鍵只認自有可列舉之資料屬性**:列之 `id` 為**繼承**(原型鏈上,不論值之型別)或**自有不可列舉**者視為未帶:`autoGenPk` 開則補新主鍵(`setPk`:物件(含函式)之列一律以 `Object.defineProperty` 設為自有可列舉資料屬性〔`writable`/`enumerable`/`configurable` 皆真,同賦值所建〕,**不用賦值**——原型之 `id` 為 frozen 或只有 getter 時,嚴格模式賦值拋 `TypeError`;`setPk` 內不查描述子〔呼叫端已判定未帶〕;非物件之列維持賦值,使 `insert([5])` 之原生 `TypeError` 訊息不變)、關則照既有之「未帶」處置(整批 reject `invalid data[<k>].id, autoGenPk is false`,`save` 亦同)。
+2. **判定不得多讀有效輸入**:先以既有路徑取值(`v.id`、`get(v, 'id')`),值為未帶即短路;只有值為「給了」才查描述子(`Object.prototype.propertyIsEnumerable.call(v, 'id')`,不呼叫 getter)。`procPk`:`id === undefined || null || '' || !isOwnPk(v)`;`getDelPk`:`chkPk(id, 0) === null && !isOwnPk(v)`(有效字串才查,已為無效之值〔繼承空字串、數字〕沿用原訊息)。
+3. **`del`/`delGfs`**:繼承之主鍵(含自有不可列舉)視為未給主鍵,該筆 `ok:0` 附既有之無效主鍵訊息 `invalid id: not a string at [data[<k>].id]`,每筆一次 `error` 事件,同批皆不合格不連線,**不得刪除庫內同值之列/檔案**;`save` 不得以繼承值覆寫或 upsert 同值之列;`insert`/`insertBulk` 不得因繼承值而寫入無 `id` 欄之列。
+4. `selectByPk`/`selectByPkGfs` 收純量,不適用(測試釘住傳列物件回 `null`、不連線、不發事件)。
+5. **非主鍵欄之繼承可列舉欄位**:既有處置不變(BSON 只存自有可列舉屬性,繼承欄位不寫入;不在本規則範圍,測試釘住)。
+6. `delGfs` 不複製 `data`:列為 `Proxy` 而僅以 `get` 陷阱虛擬 `id`、目標物件無該自有屬性者視為未帶(描述子查詢經 `getOwnPropertyDescriptor` 陷阱);查描述子拋錯者與元素讀取同通道(`invalid data: must be a readable value`,於 `getDelPk` 所在之 `try` 內)。
+
+**站點全集**(盤點指令見下;判準:已套/不適用)
+
+| 站點 | 取值 | 處置 |
+|---|---|---|
+| `procPk` ← `procDocs`(`insert`、`insertBulk` 共用)、`save`、`insertGfs`(3 個呼叫點) | `v.id` → `isOwnPk` | 已套(`setPk` 補值);`insertGfs` 之 `{ ...v }` 展開使繼承值不可見,`procPk` 為縱深 |
+| `getDelPk` ← `del`(複製後之複本)、`delGfs`(原物件) | `get(v,'id')` → `isOwnPk` | 已套 |
+| `chkDoc`/`chkPk(v.id)`、`saveOne` 之 `{ id: v.id }`、`_uploadGfs(v.id)` | 作用於 `procPk` 之後之複本(`id` 已為自有) | 不適用(下游) |
+| `selectByPk`、`selectByPkGfs`、`select`/`delAll`/`delAllGfs`(條件) | 純量 `pk`/條件白名單 | 不適用 |
+
+**修前/修後**(入口 × 形狀,seed 含與繼承值同值之既有列;探針 `probe-before/after` 共 288 格,修前後差異 120 格,皆為下列繼承形狀之 `autoGenPk` 真假分支)
+
+| 入口 | 繼承字串/類別 getter/frozen 原型/自有不可列舉(有繼承值者) | 繼承數字、物件 |
+|---|---|---|
+| `insert`、`insertBulk` | 修前:寫入無 `id` 欄之列。修後:`autoGenPk` 開補新 UUIDv7、關整批 reject `autoGenPk is false`,既有同值之列原封不動 | 修前:整批 reject `not a string`。修後:同左(視為未帶) |
+| `save` | 修前:同值列則覆寫(`nModified:1`)、無則以該值新增。修後:同上(補新 id/整批 reject),同值列不動 | 修前:該筆 `ok:0`。修後:視為未帶 |
+| `del`、`delGfs` | 修前:刪除同值之列/檔案。修後:該筆 `ok:0`,`not a string`,不刪除 | 不變(`not a string`) |
+| `insertGfs` | 不變(修前即補新 id/reject) | 不變 |
+
+自有可列舉(含自有遮蔽繼承、自有存取器)、`id` 為 `undefined`/`null`/`''`/鍵不存在:全入口不變。繼承空字串:修前即未帶,不變(`del`/`delGfs` 仍 `string is empty`)。
+
+**盤點指令**
+
+- `Grep "propertyIsEnumerable" src/WOrmMongodb.mjs` → 恆為 1 處(`isOwnPk`);`Grep "isOwnPk\(" src/WOrmMongodb.mjs` → 1 處定義 + 3 處呼叫(`setPk`、`procPk`、`getDelPk`)。
+- `Grep "getDelPk\(" src/WOrmMongodb.mjs` → 1 處定義 + 2 處呼叫(`del`、`delGfs`);`Grep "get\(v, 'id'\)" src/WOrmMongodb.mjs` → 僅 `getDelPk` 內 1 處(呼叫端不得內聯另一份取值)。
+- `Grep "procPk\(" src/WOrmMongodb.mjs` → 1 處定義 + 3 處呼叫(同 R-PKGIVEN-01);`Grep "\.id = " src/WOrmMongodb.mjs` → 僅 `setPk` 內 1 處賦值(補值不得以賦值,見規則句 1)。
+
+**對應測試**(單檔:`npx mocha --no-parallel test/api-pk-own.test.mjs --timeout 180000`,約 1.5 分鐘,自建 docker 容器 `worm-test-mongodb-pkown`,環境變數 `WORM_PKOWN_CT` 可覆寫容器名):`test/api-pk-own.test.mjs` 408 案——入口 6(`insert`、`insertBulk`、`save`、`insertGfs`、`del`、`delGfs`)× 形狀 15(繼承字串/數字/物件/空字串、類別 getter〔字串、數字〕、frozen 原型、自有不可列舉〔無繼承、下有繼承字串〕、無 `id` 鍵、無原型且無 `id`;對照:自有可列舉、自有遮蔽繼承、自有欄位名為 `propertyIsEnumerable`/`hasOwnProperty`、無原型之自有 `id`)× seed 2(`same`:與繼承值同值之既有列〔字串 `a9`、字串 `123`、文件另有數字 `123`〕、`other`)× `autoGenPk` 2 = 360 案;`change` 事件資料之新 `id` 為自有可列舉可寫可設定之資料屬性 20 案;批次(逐筆各自判定、同批兩筆繼承不撞鍵、最小索引、同批之有效 `del`)、單一物件輸入、鍵全在原型上之單一物件(`iseobj` 早退之既有契約)、S2(`delGfs` 之 `Proxy` 陷阱記錄:未帶/無效值不查描述子、有效字串查一次、`get` 虛擬值與原型繼承值不刪;自有存取器僅讀一次;`null`/原始值列之既有訊息;`insert([{…}, null])` 之原生讀取錯誤、`insert([5])` 之原生賦值錯誤)、`selectByPk`/`selectByPkGfs`(純量)、非主鍵欄之繼承欄位。修前(`git archive HEAD src`)408 案 142 紅/266 綠(綠者為自有 id 對照、繼承數字/物件之 `del`/`delGfs`、`insertGfs` 全部、`null`/原始值列之既有訊息等),修後 408 綠。
+
+**變異**(須轉紅;於 `./tmp/omg569/mut/<名>/` 之複本執行,執行器為一次性腳本,不動 `src/`;基準 408/408 綠):21 項中 19 項轉紅、2 項等價存活——`procPk` 拿掉 `!isOwnPk`(101 紅)、`isOwnPk` 改 `in`(=修前行為,142 紅)、`isOwnPk` 改 `hasOwnProperty`(8 紅)、`isOwnPk` 改呼叫列物件自身方法 `v.propertyIsEnumerable('id')`(28 紅)、`procPk` 先查描述子再取值(1 紅)、`procPk` 只對字串查描述子(39 紅);`setPk` 改賦值(26 紅)、補值不可列舉(68 紅)、補值不可寫不可設定(20 紅);`getDelPk` 不查自有(42 紅)、先查描述子再取值(7 紅)、對任何字串即查(10 紅)、對任何給了之值即查(11 紅)、回 `''` 而非 `undefined`(41 紅);`del`、`delGfs` 兩站點各改回舊寫法 `get(v, 'id')`(18、24 紅);`procPk` 之 3 個呼叫點逐點改回舊寫法(`insert`、`insertBulk`、`save`;35、33、34 紅)。**等價存活 2 項**:`insertGfs` 之呼叫點改回舊 `procPk`、`insertGfs` 之展開改為保留原型——二者之一失效時另一道(展開只取自有可列舉屬性/`procPk`)仍擋住繼承值,故不可觀測(縱深);兩道同時移除(M18)則 33 案轉紅。
+
+**已知限制**
+
+1. `delGfs` 之 `Proxy` 列:僅以 `get` 陷阱虛擬 `id`、目標物件無該自有屬性者視為未帶(規則句 6;`del`、`insert` 系因複製後為普通物件,無此情形)。
+2. 非主鍵欄之繼承可列舉欄位:各庫既有處置不變(本庫為不寫入),不在本規則範圍(規則句 5)。
+3. 單一物件鍵全在原型上(`insert(Object.create({ id: 'a9' }))`,無自有鍵)為 wsemi `iseobj` 判無數據之早退(`{ n: 0, nInserted: 0, ok: 1 }`,`save`/`del` 為 `[]`),不在本規則範圍(測試釘住)。
+4. **自有可列舉 `id` 而原型上有 frozen(唯讀)或僅 getter 之同名 `id`**(`Object.defineProperty(Object.create(Object.freeze({ id: 'zz' })), 'id', { value: 'a1', enumerable: true, writable: true, configurable: true })`):`cloneDeep` 複製時以賦值寫入而拋 `TypeError`,`insert`/`insertBulk`/`save`/`del` 整批 reject `invalid data: must be a readable value`;`insertGfs`(展開)、`delGfs`(不複製)正常處理。**修前即如此**(對 HEAD 實測),屬複製階段(R-READABLE-01)與本規則之交界,非本規則所引入,未改;是否改為以 `Object.defineProperty` 複製(自寫複製)需主控裁示。
 
 ## R-READABLE-01 讀取即拋錯(不可讀)之輸入依原失敗通道拒絕,改用 wsemi `chkReadable`(2026-11-20,oro557d,排程第 557 項;依 dspec〈輸入參數之檢測機制〉V11、V17、V19、V20)
 
@@ -353,3 +403,7 @@
    - **複製階段之巢狀不可讀值(2026-11-20 oro557d4,第 557 項全族對齊輪 A3;主控更正規則四第 3 點)**:資料內部之 `id`、欄位、列之成員、陣列其後之元素、`u8a` 欄為已撤銷之 `Proxy`、陷阱拋錯之物件或拋錯之存取器,於複製處(`insert`/`insertBulk`/`save`/`del` 之 `cloneDeep`;`insertGfs` 之展開與元素讀取;`delGfs` 之元素與 `id` 讀取)拋錯者:由「reject 該物件所拋之原例外(`insert`/`insertBulk`/`save`/`del` 不發 `error` 事件;`insertGfs`/`delGfs` 發一次且數據參數為呼叫端原值)」改為整批 reject 固定詞彙 `invalid data: must be a readable value`(`error` 事件恰一次、數據參數 `null`,不連線、不寫入、不刪除);可讀而無法複製者(原型為 `null` 之 `Date`、過深之巢狀)之訊息由原生錯誤文字改同一固定詞彙。`insertGfs`/`delGfs` 之 `id` 為不可讀之值(非自有存取器)由「`insertGfs`:`invalid id: not a string`;`delGfs`:該筆 `ok:0` 附 `invalid id: not a string`」改為同上整批 reject(消除與 `insert` 系之不一致)。
    - **A4(同輪)**:`insertGfs` 之 `u8a` 不可讀之 `error` 事件數據參數由呼叫端原值改 `null`(訊息 `invalid data[<k>].u8a: must be a readable value` 不變);入口階段之後之拒絕與逐筆失敗之數據參數不變。
    - 不變:可讀而型別不符(`data` 為 `5`/字串/`null`/`{}`/`[]` 等視為無數據;`returnList`、`autoGenPk` 非布林取預設;`url/db/cl` 非字串不檢核;`opt` 為 `null`/`5` 之原生 `TypeError`);`select`/`delAll`/`delAllGfs` 之 `find` 不可讀 `invalid find`;複製**之後**讀取原型上之存取器等所拋者之診斷出口(已知限制 1);`opt.logDetail`/`opt.funLog` 之讀取(wsemi `getDiag`)。
+6. **2026-11-20 主鍵只認自有可列舉之資料屬性,繼承者視為未帶**(R-PKOWN-01,omg569,排程第 569 項全族;版號由發布流程決定,本次未改 `version`;不保留舊行為):
+   - `insert`/`insertBulk`/`save` 之列 `id` 為繼承(原型鏈上,如 `Object.create({ id })`、類別原型上之 getter、frozen 原型,不論繼承值之型別)或自有不可列舉(下有繼承值者):`insert`/`insertBulk` 由「寫入無 `id` 欄之列」(繼承字串)或「整批 reject `not a string`」(繼承數字、物件)改為視為未帶——`autoGenPk` 開補新 `id`(UUIDv7,自有可列舉資料屬性,庫內同值之列原封不動)、關整批 reject `invalid data[<k>].id, autoGenPk is false`;`save` 由「以繼承值為查詢條件覆寫同值之列或以該值新增」(繼承字串)或「該筆 `ok:0`」(繼承數字、物件)改為同上。
+   - `del`/`delGfs` 之列 `id` 為繼承字串(`delGfs` 另含自有不可列舉者):由「刪除庫內同值之列/檔案」改為該筆 `ok:0` 附 `invalid id: not a string at [data[<k>].id]`,不刪除、每筆一次 `error` 事件。
+   - 不變:自有可列舉之 `id`(含自有遮蔽繼承、自有存取器)、`id` 為 `undefined`/`null`/`''`/鍵不存在、繼承空字串(修前即未帶)、繼承數字/物件於 `del`/`delGfs`(`not a string`);`insertGfs`(展開複本只含自有可列舉屬性,修前即合規);`selectByPk`/`selectByPkGfs`(純量);非主鍵欄之繼承欄位(BSON 不寫入);鍵全在原型上之單一物件(無數據早退)。

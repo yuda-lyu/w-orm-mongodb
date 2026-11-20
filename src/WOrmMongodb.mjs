@@ -35,6 +35,10 @@ import pmSeries from 'wsemi/src/pmSeries.mjs'
  * opt.autoGenPk預設為true，insert、insertBulk、save與insertGfs於輸入未帶id(id為undefined、null或空字串)時自動產生；del於任一設定下皆不補值。
  * 呼叫端給了id而不合格者(非字串，如數字、布林、物件、陣列、String包裝物件、Symbol、BigInt；或含NUL、孤立代理字元)一律拒絕而不補值、不替換(訊息invalid id: 原因 at [data[k].id])，
  * 因主鍵為資料之身分，給了錯值而換成新id寫入，事後無從對應；此拒絕不隨opt.autoGenPk改變。
+ * 主鍵只認自有可列舉之資料屬性(R-PKOWN-01，w-orm系列一致)：列之id為繼承(原型鏈上，如Object.create({ id })、類別原型上之getter、frozen原型，不論繼承值之型別)或自有不可列舉者視為未帶：
+ * insert、insertBulk、save、insertGfs於opt.autoGenPk為true時補新主鍵(以Object.defineProperty定義為自有可列舉之資料屬性，遮蔽原型上之值)，為false時照既有之未帶處置(整批reject)；
+ * del、delGfs視為未給主鍵(該筆ok為0，invalid id: not a string at [data[k].id])，不得以原型上之值刪除庫內同值之列。判定先以既有路徑取值，值為未帶即短路，只有值為給了才查描述子(不呼叫存取器)。
+ * selectByPk、selectByPkGfs收純量，不適用；非主鍵欄之繼承欄位之處置不變(BSON只存自有可列舉屬性，不在本規則範圍)。
  * opt.autoGenPk為false時套件一律不產生id，未帶id者以reject拋出，且id之唯一性與格式皆由呼叫端自負。
  *
  * 字串良構檢核(w-orm系列一致，不隨opt.autoGenPk改變)：BSON會把孤立代理字元(String.prototype.isWellFormed()為false者)無聲改寫為U+FFFD，
@@ -394,6 +398,64 @@ function WOrmMongodb(opt = {}) {
 
 
     /**
+     * 判定單筆數據(已複製之複本)之id是否為自有可列舉之屬性(規則帳本R-PKOWN-01)
+     * 註: 主鍵只認自有可列舉之資料屬性；繼承(原型鏈上，如Object.create({ id })或類別原型上之getter、資料屬性，不論繼承值之型別)者視為未帶：
+     * cloneDeep保留原型，故v.id會讀得原型上之值而判為已帶，但BSON序列化只存自有可列舉之屬性，結果為寫入無id欄之列(insert、insertBulk)，
+     * 或以繼承值當查詢條件覆寫、upsert、刪除庫內同值之列(save、del、delGfs)；
+     * 自有不可列舉者於複製時已不被複製(cloneDeep只取自有可列舉鍵)，故於複本上不會出現，delGfs未複製故以本函數兼判之
+     * 註: 只在需要分辨時才呼叫(先以既有路徑取值，值為未帶者免查)，且propertyIsEnumerable不呼叫getter、不讀值，不致多讀有效輸入
+     *
+     * @ignore
+     * @param {Object} v 輸入數據物件
+     * @returns {Boolean} 回傳id是否為自有可列舉之屬性布林值
+     */
+    function isOwnPk(v) {
+        return Object.prototype.propertyIsEnumerable.call(v, 'id')
+    }
+
+
+    /**
+     * 於單筆數據(已複製之複本)補上主鍵值
+     * 註: 物件(含函式)之列一律以defineProperty定義自有可列舉之資料屬性，遮蔽原型上之值，不得以賦值(v.id = id)：
+     * 原型上之id為唯讀(frozen)或僅有getter者，嚴格模式下賦值會拋TypeError，賦值亦會觸發原型上之setter而不產生自有屬性；
+     * 呼叫端已判定id為未帶(含值為未帶者)，故此處不查描述子(值為未帶者不查描述子)；
+     * 複本上之自有id(值為undefined、null、空字串)為可設定之資料屬性(cloneDeep與展開所產生)，重新定義即覆寫其值；
+     * 非物件之列(賦值照既有行為拋原生錯誤，如insert([5]))維持賦值
+     *
+     * @ignore
+     * @param {Object} v 輸入數據物件
+     * @param {String} id 輸入主鍵值字串
+     * @returns {undefined} 無回傳
+     */
+    function setPk(v, id) {
+        if (v !== null && (typeof v === 'object' || typeof v === 'function')) {
+            Object.defineProperty(v, 'id', { value: id, writable: true, enumerable: true, configurable: true })
+            return
+        }
+        v.id = id
+    }
+
+
+    /**
+     * 取單筆數據供刪除用之主鍵值(del、delGfs)
+     * 註: 先以既有路徑取值(get)，值為有效字串者才查是否為自有可列舉之屬性；繼承者(含自有不可列舉者)視為未給主鍵，回傳undefined，
+     * 使其後chkPk以既有之固定詞彙invalid id: not a string拒絕，該筆ok為0，不得以原型上之值刪除庫內同值之列(R-PKOWN-01)；
+     * 已為無效者(繼承之空字串、數字等)原樣回傳，沿用原訊息(不多查描述子)
+     *
+     * @ignore
+     * @param {Object} v 輸入數據物件
+     * @returns {*} 回傳主鍵值，繼承者回傳undefined
+     */
+    function getDelPk(v) {
+        let id = get(v, 'id')
+        if (chkPk(id, 0) === null && !isOwnPk(v)) {
+            return undefined
+        }
+        return id
+    }
+
+
+    /**
      * 檢查並補齊單筆數據之主鍵
      * autoGenPk為true時未帶id者自動產生，為false時往外拋
      * 註: 僅undefined、null與空字串視為未帶id(空字串為既有文件化之行為，見README)；呼叫端給了其他值(數字、布林、物件、陣列、
@@ -401,6 +463,8 @@ function WOrmMongodb(opt = {}) {
      * 因主鍵為資料之身分，呼叫端給了錯值卻換成新id寫入，事後無從對應
      * 註: 判定不得改用isestr等語意可隨wsemi版本改變之判斷函數(wsemi 1.9.69起isestr不收String包裝物件，原寫法即因此把包裝物件靜默換成新id)，
      * 一律以===比對，且不呼叫被檢測值之任何方法或陷阱
+     * 註: id非自有可列舉之屬性(繼承，規則帳本R-PKOWN-01，不論繼承值為何)者亦視為未帶id：先以既有路徑v.id取值，值為未帶者短路不查描述子，
+     * 只有值為給了才查isOwnPk(不呼叫getter)；補值以setPk(defineProperty)
      * 註: 未帶id屬呼叫端未履行契約而非某一筆資料本身之問題，故為整批性錯誤而不降級為該筆ok為0，
      * 若降級為逐筆結果，呼叫端易於整批resolve之下漏看，使[忘了給id]靜默變成[少寫了幾筆]
      * 註: 本函數須於任何寫入之前一次對全部數據完成，令拋錯時同批之有效筆數亦不會被寫入
@@ -415,8 +479,8 @@ function WOrmMongodb(opt = {}) {
         //id, 僅取一次
         let id = v.id
 
-        //check, 僅undefined、null與空字串為未帶id
-        if (id === undefined || id === null || id === '') {
+        //check, 僅undefined、null與空字串為未帶id, 或id為繼承者(給了而非自有可列舉)
+        if (id === undefined || id === null || id === '' || !isOwnPk(v)) {
 
             //check, autoGenPk為false時主鍵須由呼叫端自備
             if (!autoGenPk) {
@@ -424,7 +488,7 @@ function WOrmMongodb(opt = {}) {
             }
 
             //genIDSeq
-            v.id = genIDSeq()
+            setPk(v, genIDSeq())
 
         }
 
@@ -802,6 +866,8 @@ function WOrmMongodb(opt = {}) {
      * 聚合計數僅能回答[有幾筆]，而去重類呼叫端須知何者為新方能對其執行下游動作
      * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
      * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
+     * 註: 主鍵只認自有可列舉之資料屬性(R-PKOWN-01)：id為繼承(原型鏈上，如Object.create({ id })、類別原型上之getter、frozen原型，不論繼承值之型別)或自有不可列舉者視為未帶，
+     * autoGenPk為true補新主鍵(自有可列舉之資料屬性，遮蔽原型上之值)，為false照既有之未帶處置(invalid data[k].id, autoGenPk is false)；不得以繼承值寫入無id欄之列、跳過或撞鍵
      * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，
      * 訊息為invalid id: 原因 at [data[k].id]或invalid data: 原因 at [data[k].路徑]，以索引最小之不合格筆為準，不回顯值，error事件於reject前發出一次
      * 註: data(資料容器)、option與option.returnList為讀取即拋錯(不可讀)者(已撤銷之Proxy、Symbol.toStringTag或陷阱拋錯之物件、陣列length或[0]讀取拋錯等)，
@@ -1088,6 +1154,8 @@ function WOrmMongodb(opt = {}) {
      * 註: n為輸入筆數，nInserted於成功時恆等於n；不提供逐筆結果，故不出現ok為0與err
      * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
      * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
+     * 註: 主鍵只認自有可列舉之資料屬性(R-PKOWN-01)：id為繼承(原型鏈上，如Object.create({ id })、類別原型上之getter、frozen原型，不論繼承值之型別)或自有不可列舉者視為未帶，
+     * autoGenPk為true補新主鍵(自有可列舉之資料屬性，遮蔽原型上之值)，為false照既有之未帶處置(invalid data[k].id, autoGenPk is false)；不得以繼承值寫入無id欄之列、跳過或撞鍵
      * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，於連線與寫入之前整批reject且同批皆不寫入，訊息格式同insert
      * 註: data為讀取即拋錯(不可讀)者於連線之前整批reject(invalid data: must be a readable value，error事件恰一次)，可讀而型別不符者視為無數據(同insert)；
      * 資料內部之巢狀不可讀值(深拷貝處拋錯者)走同一通道(同insert)
@@ -1341,6 +1409,8 @@ function WOrmMongodb(opt = {}) {
      * 相同者不寫入而nModified為0；本筆失敗不中斷整批，該筆以ok為0並附err回報
      * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
      * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(該筆以ok為0並附err: invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
+     * 註: 主鍵只認自有可列舉之資料屬性(R-PKOWN-01)：id為繼承(原型鏈上，不論繼承值之型別)或自有不可列舉者視為未帶，autoGenPk為true補新主鍵(自有可列舉之資料屬性)，為false整批reject(invalid data[k].id, autoGenPk is false)；
+     * 不得以繼承值為查詢條件覆寫或新增同值之列
      * 註: 主鍵id含孤立代理字元或NUL，或資料之字串值、鍵名(含巢狀)含孤立代理字元者，該筆以ok為0並附err(invalid id: …或invalid data: …，不回顯值)回報，
      * 不送往伺服器，每筆一次error事件，同批其他筆照常；同批皆不合格時不連線
      * 註: data(資料容器)、option與option.autoInsert為讀取即拋錯(不可讀)者於連線之前整批reject(invalid data: must be a readable value、invalid option: must be a readable value、invalid option.autoInsert: must be a readable value)，
@@ -1472,6 +1542,8 @@ function WOrmMongodb(opt = {}) {
      * 註: n為id命中筆數；未帶有效id(非字串、空字串、含NUL或孤立代理字元)者視為本筆無法處理，不送查詢條件且以ok為0、n為0並附err(invalid id: 原因 at [data[k].id]，不回顯值)回報，
      * 每筆一次error事件，同批其他筆照常，同批皆不合格時不連線；
      * 判斷本筆是否真的被刪除一律以nDeleted為準
+     * 註: 主鍵只認自有可列舉之資料屬性(R-PKOWN-01)：id為繼承(原型鏈上，不論繼承值之型別)或自有不可列舉者視為未給主鍵，該筆以ok為0並附err(invalid id: not a string at [data[k].id])，
+     * 不得以原型上之值刪除庫內同值之列；繼承之空字串等已為無效者沿用原訊息
      * 註: data(資料容器)為讀取即拋錯(不可讀)者於連線之前整批reject(invalid data: must be a readable value，error事件恰一次，不刪除任何數據)，可讀而型別不符者視為無數據(回傳空陣列)；
      * 資料內部之巢狀不可讀值(id、欄位、陣列其後之元素等，於深拷貝處拋錯者)走同一通道(同insert)
      *
@@ -1512,9 +1584,9 @@ function WOrmMongodb(opt = {}) {
             }
 
             //ids與msgBads, del不補值, 於已複製之數據上僅取一次id並檢核, 須先於建立client與任何刪除, 其後一律使用此處之id(檢查之值即使用之值);
-            //未帶有效id者視為本筆無法處理
+            //未帶有效id者視為本筆無法處理; 主鍵只認自有可列舉之屬性(R-PKOWN-01): 繼承者視為未給(getDelPk回undefined), 不得以原型上之值刪除庫內同值之列
             let ids = map(data, function(v) {
-                return get(v, 'id')
+                return getDelPk(v)
             })
             let msgBads = {}
             each(ids, function(id, k) {
@@ -1731,6 +1803,8 @@ function WOrmMongodb(opt = {}) {
      * 註: n為輸入筆數，nInserted為實際插入筆數，全數已存在而nInserted為0屬正常結果
      * 註: opt.autoGenPk為true(預設)時未帶id(undefined、null或空字串)者自動產生，為false時未帶id即reject且同批皆不寫入；
      * 給了id而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)者不補值、不替換，依主鍵檢核拒絕(invalid id: not a string at [data[k].id]，不回顯值)，不隨autoGenPk改變
+     * 註: 主鍵只認自有可列舉之資料屬性(R-PKOWN-01)：id為繼承(原型鏈上，如Object.create({ id })、類別原型上之getter、frozen原型，不論繼承值之型別)或自有不可列舉者視為未帶，
+     * autoGenPk為true補新主鍵(自有可列舉之資料屬性，遮蔽原型上之值)，為false照既有之未帶處置(invalid data[k].id, autoGenPk is false)；不得以繼承值寫入無id欄之列、跳過或撞鍵
      * 註: 主鍵id含孤立代理字元或NUL者於連線與寫入之前整批reject且同批皆不寫入(訊息invalid id: 原因 at [data[k].id]，不回顯值)；
      * 本函數僅寫入id(檔名)與u8a(位元組)，其餘欄位不寫入故不檢核
      * 註: data(資料容器)為讀取即拋錯(不可讀)者於連線之前整批reject(invalid data: must be a readable value，error事件恰一次)，可讀而型別不符者視為無數據；
@@ -2053,6 +2127,8 @@ function WOrmMongodb(opt = {}) {
      * 使用GridFS，刪除數據
      * 註: n為id命中筆數；未帶有效id(非字串、空字串、含NUL或孤立代理字元)者視為本筆無法處理，尚未查找即以ok為0、n為0並附err(invalid id: ...，不回顯值)回報，不影響同批其他筆；
      * 判斷本筆是否真的被刪除一律以nDeleted為準
+     * 註: 主鍵只認自有可列舉之資料屬性(R-PKOWN-01)：id為繼承(原型鏈上，不論繼承值之型別)或自有不可列舉者視為未給主鍵(該筆ok為0，invalid id: not a string at [data[k].id])，
+     * 不得以原型上之值刪除庫內同值之檔案；本函數不複製data，先以既有路徑取值，值為有效字串者才查描述子(propertyIsEnumerable，不呼叫存取器)
      * 註: data(資料容器)為讀取即拋錯(不可讀)者於連線之前整批reject(invalid data: must be a readable value，error事件恰一次，不刪除任何數據)，可讀而型別不符者視為無數據(回傳空陣列)；
      * 本函數不深拷貝，複製處為陣列元素與其id之讀取(僅讀id，其餘欄位不讀取不檢核)：元素或id於此拋錯者(已撤銷之Proxy元素、拋錯之存取器等)，以及id之值為不可讀者(非自有存取器，如已撤銷之Proxy)，
      * 皆整批reject固定詞彙invalid data: must be a readable value(error事件恰一次，數據參數null，不連線、不刪除任何數據，先於逐筆處置)，不再為該筆ok為0
@@ -2091,8 +2167,10 @@ function WOrmMongodb(opt = {}) {
                 data = map(isarr(data) ? data : [data], function(v) {
                     return v
                 })
+                //主鍵只認自有可列舉之屬性(R-PKOWN-01): 本函數不複製data, 元素之id為繼承者或自有不可列舉者視為未給(getDelPk回undefined),
+                //不得以其值刪除庫內同值之檔案; 查描述子亦屬讀取元素, 拋錯者(Proxy之getOwnPropertyDescriptor陷阱等)走同一通道
                 ids = map(data, function(v) {
-                    return get(v, 'id')
+                    return getDelPk(v)
                 })
             }
             catch (err) {
