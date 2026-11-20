@@ -10,7 +10,7 @@
 | S2 | 逐筆 `err`:`saveOne` catch、`del` 逐筆 catch、`delGfs` 逐筆 catch | 驅動(外來) | `err: outMsg(err)` → `diag.mask`;`error` 事件之訊息為同一字串 |
 | S2' | 逐筆 `err: msgBad`/`msgBads[k]`(`saveOne` 不合格早退、`del`、`delGfs`) | 本套件固定詞彙 | 原樣(刻意不包) |
 | S3 | `finally` 內 `closeClient`(11 處) | 驅動(外來) | `diag.err` |
-| S4 | `cloneData`(`insert`、`insertBulk`、`save`、`del`,`try` 之外) | 使用端輸入之存取器/Proxy(外來) | `diag.err` |
+| S4 | `cloneData`(`insert`、`insertBulk`、`save`、`del`,`try` 之外) | 使用端輸入之存取器/Proxy(外來) | 2026-11-20 oro557d4(第 557 項 A3)起**不再轉出外來值、不經 `diag.err`**:複製處拋錯者回 `null`,呼叫端 `rejectUnreadable` 走固定詞彙 `invalid data: must be a readable value` + `error` 事件恰一次(數據參數 `null`,R-READABLE-01 規則句 10);原為 `diag.err` 遮罩後轉出且不發 `error` 事件。複製**之後**才讀取之外來值(原型上之存取器)仍經 S1 之 `outErr` 遮罩(`unit-diagwire` S4 第二組釘住) |
 | S5 | `genClient()`(11 呼叫點,皆在 `try` 內) | 驅動解析連線字串(外來) | 經 S1;樣式 `mongoHostEcho` 遮回顯之主機位址項 |
 | S6 | 內部轉手:`_uploadGfs` 之 `pm.reject(err)`(2 處)、`selectByPkGfs` 之 `pm.reject(err)`、`insert` 內層 `throw err`、`_insertBulkByCompensate` 之 `throw errIns`、`_findGfs` 之 `Promise.reject(res)` | 驅動 | 不遮(原值供 `isDupKeyError`、`ENOENT` 判定與 `delGfs` 逐筆使用),由接住處之 S1/S2 遮罩後才對外 |
 | S7 | 建構期 `throw new Error('invalid opt.<名>: …')` | 本套件固定詞彙 | 原樣(不包) |

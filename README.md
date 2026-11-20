@@ -10,6 +10,40 @@ An operator for mongodb in nodejs.
 
 ## 破壞性變更
 
+### 讀取即拋錯(不可讀)之輸入依原失敗通道拒絕，不再被當成「無數據」或預設值(`w-orm-*`系列一致)
+
+呼叫端給的資料容器(`data`)、選項(`option`、`opt`)、主鍵參數(`selectByPk`、`selectByPkGfs`之`pk`)若**讀取即拋錯**(已撤銷之`Proxy`、`Symbol.toStringTag`或陷阱拋錯之物件、陣列`length`或`[0]`之讀取拋錯、拋錯之存取器等)，與「可讀而型別不符」分開處理：不可讀者以固定詞彙拒絕(`invalid <名稱>: must be a readable value`，不含原例外文字、不回顯值)，可讀而型別不符者維持既有處理。不設過渡期：
+
+| 項目 | 原行為 | 現行為 |
+|---|---|---|
+| `insert`、`insertBulk`、`save`、`del`、`insertGfs`、`delGfs`之`data`為讀取即拋錯者(如已撤銷之`Proxy`) | 與`5`、`'abc'`、`null`一併視為「無數據」，resolve正常結果(`{ n: 0, nInserted: 0, ok: 1 }`或`[]`)，無事件(1.9.68以前之wsemi為reject) | 整批`reject`：`invalid data: must be a readable value`；`error`事件於`reject`前恰發一次(數據參數為`null`)，不連線、不寫入、不刪除 |
+| `data`為可讀而型別不符(`5`、字串、`null`、`undefined`、`{}`、`[]`、`Map`等) | 視為「無數據」，resolve正常結果 | 不變 |
+| `insert`之`option`、`save`之`option`為讀取即拋錯者(已撤銷之`Proxy`、陷阱拋錯) | `reject`原生錯誤(如`Cannot perform 'get' on a proxy that has been revoked`)，不發`error`事件 | 整批`reject`：`invalid option: must be a readable value`，`error`事件恰一次(數據參數為`null`) |
+| `insert`之`option.returnList`、`save`之`option.autoInsert`為讀取即拋錯者(含拋錯之存取器) | `returnList`被當成非布林而取預設`false`；`autoInsert`原值交給驅動(靜默不插入)；存取器拋錯者`reject`原生錯誤 | 整批`reject`：`invalid option.returnList: must be a readable value`、`invalid option.autoInsert: must be a readable value`，`error`事件恰一次(數據參數為`null`) |
+| `option.returnList`可讀而非布林值(含`Boolean`包裝物件) | 取預設`false` | 不變(`save`之`option.autoInsert`可讀而非布林值之處理亦不變) |
+| `insertGfs`之`u8a`為讀取即拋錯者(值為已撤銷之`Proxy`等) | `invalid data[<k>].u8a` | `invalid data[<k>].u8a: must be a readable value`；`error`事件之數據參數為`null`(可讀而非`Uint8Array`者仍為`invalid data[<k>].u8a`，數據參數不變) |
+| 建構`opt`為讀取即拋錯者(已撤銷之`Proxy`、陷阱拋錯)或其`url`、`db`、`cl`、`autoGenPk`鍵為拋錯之存取器 | 同步`throw`原生錯誤或原例外 | 同步`throw`：`invalid opt: must be a readable value`、`invalid opt.<鍵>: must be a readable value` |
+| 建構`opt.autoGenPk`為讀取即拋錯之值(已撤銷之`Proxy`、`Symbol.toStringTag`拋錯之物件等) | 非布林值而取預設`true` | 同步`throw`：`invalid opt.autoGenPk: must be a readable value`(可讀而非布林值仍取預設`true`) |
+| 建構`opt.url`、`opt.db`、`opt.cl`為讀取即拋錯之非字串值 | 不檢核，建構成功(使用時才失敗) | 同步`throw`：`invalid opt.<名>: must be a readable value`(可讀之非字串值仍不檢核) |
+| 建構`opt`為`null`、`5`等可讀而型別不符 | 原生`TypeError` | 不變(不改寫) |
+| `selectByPk`、`selectByPkGfs`之主鍵參數`pk`為讀取即拋錯之物件(已撤銷之`Proxy`、`Symbol.toStringTag`拋錯之物件等) | 回傳`null`(與任何非字串之主鍵同一通道) | `reject`：`invalid pk: must be a readable value`；`error`事件於`reject`前恰發一次(數據參數為`null`)，不連線 |
+| `selectByPk`、`selectByPkGfs`之`pk`為可讀而非字串(`5`、`String`包裝物件、`{}`、`null`、`undefined`、空字串、含NUL或孤立代理字元之字串等) | 回傳`null` | 不變(回傳`null`，不連線、不發事件) |
+| 容器可讀而其成員為拋錯之存取器：建構`opt`之`url`、`db`、`cl`、`autoGenPk`，`option.returnList`、`option.autoInsert`，長度為1之陣列`data`而`[0]`為存取器 | 同步`throw`或`reject`存取器所拋之原例外(其文字由呼叫端之物件決定，可能含機敏字串) | 於讀取處捕捉並轉為同列之固定詞彙(`invalid opt.<鍵>: …`、`invalid option.<鍵>: …`、`invalid data: …`)，不含存取器所拋之原例外文字，依該入口之原失敗通道拒絕 |
+| `select`、`delAll`、`delAllGfs`之`find`為讀取即拋錯之物件 | `reject`：`invalid find: an exception was thrown while reading the condition at [find]` | 不變(條件(find)白名單) |
+
+判定方式：wsemi之`chkReadable`僅於判斷函數(`iseobj`、`isearr`等)回`false`之分支內才探針，有效輸入不經探針、不多讀；讀取範圍與判斷函數逐項同源(自有鍵只對標籤為`[object Object]`者讀，故`Buffer`、型別陣列、`Map`、`String`包裝物件等視為「可讀而型別不符」，不展開其索引鍵)。`chkReadable`不呼叫存取器，陣列`[0]`為拋錯之存取器者由套件於分支內自讀。`opt.logDetail`、`opt.funLog`之讀取由wsemi之`getDiag`擁有(不可讀者視為未給)，不在本變更範圍。
+
+**資料內部之巢狀不可讀值(複製階段)**：資料元素或巢狀值不可讀(如`data = [已撤銷之Proxy]`、長度大於1之陣列其後之元素為拋錯之存取器、`id`為`Proxy`或拋錯之存取器、其他欄位或`u8a`欄為拋錯之存取器、陷阱拋錯之物件)，於資料複製處(`insert`、`insertBulk`、`save`、`del`為深拷貝；`insertGfs`為陣列元素之讀取與展開；`delGfs`為陣列元素與其`id`之讀取)拋錯者，與頂層不可讀走同一通道：
+
+| 項目 | 原行為 | 現行為 |
+|---|---|---|
+| 複製處拋錯(`insert`、`insertBulk`、`save`、`del`、`insertGfs`、`delGfs`；含可讀而無法複製者，如原型為`null`之`Date`、過深之巢狀) | `reject`該物件所拋之原例外(文字由呼叫端之物件決定，可能含機敏字串)；`insert`、`insertBulk`、`save`、`del`不發`error`事件，`insertGfs`、`delGfs`發一次且數據參數為呼叫端原值 | 整批`reject`：`invalid data: must be a readable value`；`error`事件於`reject`前恰發一次、數據參數為`null`；不連線、不補值、不寫入、不刪除。複製處不分辨拋錯之原因，亦不轉出其例外文字 |
+| `insertGfs`、`delGfs`之`id`為不可讀之值(已撤銷之`Proxy`、`Symbol.toStringTag`或`ownKeys`陷阱拋錯之物件等；非自有存取器) | `insertGfs`：`invalid id: not a string …`；`delGfs`：該筆`ok: 0`附`invalid id: not a string …`(與`insert`系之原例外不一致) | 同上列(整批`reject`、`invalid data: must be a readable value`)，與`insert`系一致；探針只置於「`id`給了而非字串」之分支內 |
+
+GFS系之處置：`insertGfs`、`delGfs`不深拷貝(`insertGfs`僅寫入`id`與`u8a`，`delGfs`僅讀`id`，其餘欄位不寫入、不讀取亦不檢核)，故只有實際讀取之處才算「複製處」：`insertGfs`之元素讀取、展開(拋錯之存取器、`ownKeys`陷阱拋錯之元素、已撤銷之`Proxy`元素)與`id`、`u8a`之值；`delGfs`之元素讀取與`id`；其餘欄位(如`delGfs`、`insertGfs`之非`id`／`u8a`欄為已撤銷之`Proxy`或巢狀值不可讀)不被讀取，維持成功。範圍只到複製處為止：複製**之後**讀取原型上之存取器、繼承之存取器、`Error`值之`message`等所拋者(如`Object.create({ get id() { throw … } })`於`insert`、`insertBulk`、`save`、`del`)屬外來錯誤之診斷出口，維持原例外(經`outErr`遮除連線憑證)，不在本變更範圍；此原例外文字由呼叫端之物件決定，請勿於其中放置機敏字串。
+
+**入口階段拒絕之`error`事件**(上列不可讀拒絕，含頂層、選項、存取器、巢狀值、`insertGfs`之`u8a`值、`selectByPk`之`pk`)之數據參數一律為`null`(不把不可讀之值交給訂閱函數)；入口階段之後之整批拒絕(如`invalid id: not a string`、`autoGenPk`為`false`而缺`id`、`invalid data: string contains lone surrogate`、`insertGfs`之`u8a`可讀而非`Uint8Array`)與逐筆失敗之數據參數不變。
+
 ### 給了而不合格之主鍵(`id`)一律拒絕，不再靜默替換為新`id`(詳見下方「Primary key」)
 
 主鍵為資料之身分，呼叫端給了錯值卻被換成新`id`寫入，事後無從對應。本版起，**只有**`id`為`undefined`、`null`(含鍵不存在)與空字串(既有文件化之行為)視為「未帶主鍵」，其餘一律視為「給了」；給了而非字串(數字、布林、物件、陣列、`String`包裝物件、`Symbol`、`BigInt`等)者**拒絕**，不補值、不替換，不設過渡期：
@@ -19,12 +53,12 @@ An operator for mongodb in nodejs.
 | `insert`、`insertBulk`、`insertGfs`、`save`之`id`為數字、布林、物件、陣列、`Symbol`、`BigInt`、`Date`、函式等非字串，且`autoGenPk`為`true` | 視為未帶而自動產生新`id`並寫入(如`insert({ id: 5 })`寫入的是新產生之`id`，原值消失) | `insert`、`insertBulk`、`insertGfs`整批`reject`且不寫入任何一筆；`save`該筆`ok: 0`附`err`，同批其他筆照常。訊息皆為`invalid id: not a string at [data[<k>].id]`(固定詞彙、不回顯值) |
 | 同上，且`autoGenPk`為`false` | `reject`：`invalid data[<k>].id, autoGenPk is false`(`save`亦同，整批) | 同上列(依主鍵檢核拒絕，不隨`autoGenPk`改變)；`save`改為該筆`ok: 0`附`err`，不再整批`reject` |
 | `String`包裝物件(`new String('a')`)作為`id` | 舊版即拒收(`invalid id: not a string …`)；wsemi 1.9.69起其判斷函數不收包裝物件，以其判定「未帶」之套件改為把它靜默換成新`id`寫入 | 拒收(`invalid id: not a string …`)，與舊版一致 |
-| `insertGfs`之`id`為讀取即拋錯或已撤銷之`Proxy` | 同上，被換成新`id` | `reject`：`invalid id: not a string …` |
+| `insertGfs`之`id`為讀取即拋錯或已撤銷之`Proxy` | 同上，被換成新`id` | 第557項全族對齊輪起(見上節末)：`reject`：`invalid data: must be a readable value`(曾為`invalid id: not a string …`)；`id`為可讀而非字串者仍為`invalid id: not a string …` |
 | `id`為`undefined`、`null`、鍵不存在、空字串 | `autoGenPk`為`true`自動產生；為`false`整批`reject`(`invalid data[<k>].id, autoGenPk is false`) | 不變 |
-| `del`、`delGfs`、`selectByPk`、`selectByPkGfs`之`id`/`pk`為非字串 | 該筆`ok: 0`附`err`；`selectByPk`、`selectByPkGfs`回`null` | 不變 |
+| `del`、`delGfs`、`selectByPk`、`selectByPkGfs`之`id`/`pk`為非字串 | 該筆`ok: 0`附`err`；`selectByPk`、`selectByPkGfs`回`null` | 不變(`selectByPk`、`selectByPkGfs`之`pk`為「讀取即拋錯」者例外，見上節) |
 | `opt.autoGenPk`、`insert`之`option.returnList`給了非布林值(含`Boolean`包裝物件) | 部分以包裝物件之真假值生效(如`new Boolean(false)`視為真) | 非布林值一律忽略並用預設(`autoGenPk`為`true`、`returnList`為`false`)，不拒絕 |
 
-`insert`、`insertBulk`、`save`、`del`對「讀取即拋錯或已撤銷之`Proxy`」作為`id`者(或`id`為會拋錯之存取器)，於資料複製階段即以該物件所拋之錯誤`reject`(既有行為，不發`error`事件，不走`invalid id`詞彙)，同樣不補值、不寫入、不刪除。
+`insert`、`insertBulk`、`save`、`del`對「讀取即拋錯或已撤銷之`Proxy`」作為`id`者(或`id`為會拋錯之存取器)，於資料複製階段即整批`reject`：`invalid data: must be a readable value`(`error`事件恰一次、數據參數為`null`；第557項全族對齊輪起，原為該物件所拋之原例外且不發`error`事件)，不走`invalid id`詞彙，同樣不補值、不寫入、不刪除；`delGfs`對此類`id`亦同(原為該筆`ok: 0`)。
 
 ### 字串良構檢核(`w-orm-*`系列一致，詳見下方「字串良構檢核」)
 
@@ -522,7 +556,7 @@ BSON以UTF-8存放字串，**孤立代理字元**(高代理後無低代理，或
 |---|---|
 | `insert`、`insertBulk`、`insertGfs` | 寫入前檢核整批，任一筆不合格即整批`reject`、不連線、不寫入任何一筆；`error`事件於`reject`前發一次，`change`不發；以索引最小之不合格筆為準，同一筆內主鍵先於資料，同一物件內鍵名先於值 |
 | `save`、`del`、`delGfs` | 該筆回`ok: 0`並附`err`，同批其他筆照常；每個失敗筆各發一次`error`事件；同批皆不合格時不連線 |
-| `selectByPk`、`selectByPkGfs` | 回`null`(不`reject`、不發事件、不連線) |
+| `selectByPk`、`selectByPkGfs` | 回`null`(不`reject`、不發事件、不連線)；`pk`為讀取即拋錯之物件者例外，`reject`：`invalid pk: must be a readable value`(`error`事件恰一次) |
 | `select`、`delAll`、`delAllGfs` | 條件值與欄名依「條件(find)白名單」(`invalid find: …`) |
 | 建構 `WOrm(opt)` | `opt.url`/`opt.db`/`opt.cl`不合格即`throw` |
 

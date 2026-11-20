@@ -63,7 +63,8 @@ add('outMsg-never-mask', (s) => once(s, 'return diag.mask(getErrMsg(err))', 'ret
 
 //D. 關閉連線與複製輸入之站點
 add('closeClient-no-mask', (s) => nth(s, 'throw diag.err(err)', 'throw err', 1))
-add('cloneData-no-mask', (s) => nth(s, 'throw diag.err(err)', 'throw err', 2))
+//第557項A3(2026-11-20 oro557d4)起cloneData之複製處拋錯者不轉出外來值(回null, 由呼叫端走固定詞彙), 不再有diag.err之遮罩站點; 變異改為「複製處之外來值原樣往外拋」須被unit-diagwire S4殺死
+add('cloneData-foreign-rethrown', (s) => once(s, 'catch (err) {\n            return null\n        }', 'catch (err) {\n            throw err\n        }'))
 FNS.forEach((f, k) => add(`close-bypass-${f}`, (s) => nth(s, 'await closeClient(client)', 'await client.close()', k + 1)))
 ;['insert', 'insertBulk', 'save', 'del'].forEach((f, k) => add(`clone-bypass-${f}`, (s) => nth(s, 'data = cloneData(data)', 'data = cloneDeep(data)', k + 1)))
 

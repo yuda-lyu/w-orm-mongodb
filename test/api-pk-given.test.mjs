@@ -8,7 +8,7 @@ import { genUrl, startContainer, stopContainer } from './lib/api-setup.mjs'
 //規格(主控裁示, wsemi 1.9.69起判斷函數不收String包裝物件而使procPk之isestr判定改變):
 //  S1 只有undefined、null(及既有文件化之空字串)視為未帶主鍵: autoGenPk為true自動產生, 為false拋invalid data[k].id, autoGenPk is false
 //  S2 給了而非字串(數字、布林、物件、陣列、String包裝物件、Symbol、BigInt等)一律依chkPk拒絕invalid id: not a string at [data[k].id], 不回顯值, 不得靜默替換為新id
-//  S3 涵蓋所有收主鍵之入口(insert、insertBulk、save、insertGfs、del、delGfs、selectByPk、selectByPkGfs), 依各入口既有之失敗通道: 整批reject、逐筆ok為0附err、查無回傳null
+//  S3 涵蓋所有收主鍵之入口(insert、insertBulk、save、insertGfs、del、delGfs、selectByPk、selectByPkGfs), 依各入口既有之失敗通道: 整批reject、逐筆ok為0附err、查無回傳null(selectByPk、selectByPkGfs之pk讀取即拋錯者例外: 整批reject invalid pk, 2026-11-20 oro557d3)
 //  S4 執行參數(opt.autoGenPk、option.returnList)給了非布林值者依K3取預設, 不拒絕
 //每案使用全新資料表; 種子與驗證一律由驅動直接讀寫(GridFS之種子除外)
 
@@ -273,12 +273,16 @@ describe('pk given', function() {
             return o
         }
 
-        //kinds, mk為單筆數據之工廠; reCopy為於資料複製階段(cloneDeep)被拒收者之錯誤訊息; reGfs為insertGfs之錯誤訊息;
-        //isValue為true者id「值」為Proxy(insertGfs、delGfs不深拷貝而走到主鍵檢核, selectByPk與selectByPkGfs回傳null)
+        //kinds, mk為單筆數據之工廠;
+        //2026-11-20 oro557d4(第557項全族對齊輪A3、A4): 此3種id於6個收資料之入口(複製處: insert、insertBulk、save、del為深拷貝, insertGfs為展開與id、u8a之讀取, delGfs為元素與id之讀取)
+        //一律與頂層不可讀走同一通道: 整批reject固定詞彙invalid data: must be a readable value(不含原例外文字、不補值), error事件恰一次且數據參數null, 不連線、不寫入、不刪除;
+        //原為複製階段之原例外且insert、insertBulk、save、del不發error事件(insertGfs為invalid id: not a string或原例外, delGfs之Proxy值為該筆ok為0);
+        //isValue為true者id「值」為Proxy(selectByPk與selectByPkGfs之參數為id值本身, 整批reject invalid pk: must be a readable value, 見下)
+        let FIXED = 'invalid data: must be a readable value'
         let kinds = [
-            { nm: 'throwing Proxy value', mk: () => ({ id: genThrower(), name: 'n', u8a: u8a() }), isValue: true, reCopy: /^TRAP-SECRET$/, reGfs: /^invalid id: not a string at \[data\[0\]\.id\]$/ },
-            { nm: 'revoked Proxy value', mk: () => ({ id: genRevoked(), name: 'n', u8a: u8a() }), isValue: true, reCopy: /revoked/, reGfs: /^invalid id: not a string at \[data\[0\]\.id\]$/ },
-            { nm: 'throwing own getter', mk: genGetterItem, isValue: false, reCopy: /^TRAP-SECRET$/, reGfs: /^TRAP-SECRET$/ },
+            { nm: 'throwing Proxy value', mk: () => ({ id: genThrower(), name: 'n', u8a: u8a() }), isValue: true },
+            { nm: 'revoked Proxy value', mk: () => ({ id: genRevoked(), name: 'n', u8a: u8a() }), isValue: true },
+            { nm: 'throwing own getter', mk: genGetterItem, isValue: false },
         ]
 
         //callItem, 以單筆已備妥之數據呼叫入口
@@ -303,9 +307,9 @@ describe('pk given', function() {
 
         for (let k of kinds) {
 
-            //S2特例: 此值於資料複製階段(cloneDeep)即拋錯, 屬既有行為(R-DIAG-01, 拋出位置在try之外故不發error事件, 錯誤為該物件所拋之值), 仍為reject而非補值, 不寫入亦不刪除
+            //A3、A4: 6個收資料之入口一律整批reject固定詞彙, error事件恰一次且數據參數null, 不連線(無change), 不寫入亦不刪除
             for (let api of ['insert', 'insertBulk', 'save', 'del']) {
-                it(`${api}: ${k.nm} rejects at the copy stage, writes and deletes nothing`, async function() {
+                it(`${api}: ${k.nm} is rejected as unreadable at the copy stage (fixed vocabulary, error event once with null data), writes and deletes nothing`, async function() {
                     let cl = genCl()
                     let wo = WOrm(genOpt(cl))
                     let evs = collect(wo)
@@ -319,50 +323,59 @@ describe('pk given', function() {
                         rej = err
                     }
                     assert.ok(rej !== null, `must reject, resolved ${JSON.stringify(r)}`)
-                    assert.ok(k.reCopy.test(msgOf(rej)), msgOf(rej))
-                    assert.strictEqual(nType(evs, 'error'), 0)
+                    assert.strictEqual(msgOf(rej), FIXED)
+                    assert.strictEqual(nType(evs, 'error', api), 1)
+                    assert.strictEqual(evs[0].data, null)
                     assert.strictEqual(nType(evs, 'change'), 0)
                     assert.deepStrictEqual(await rawIds(cl), ['good']) //既有列原樣, 無新id列
                     await dropCl(cl)
                 })
             }
 
-            //insertGfs只淺拷貝而不深拷貝: 值為Proxy者走到主鍵檢核, 自有存取器拋錯者於展開時即拋
-            it(`insertGfs: ${k.nm} rejects and nothing is written`, async function() {
+            //insertGfs: 複製處為展開與id、u8a之讀取; 值為Proxy者(非自有存取器)於id給了而非字串之分支內探針, 與頂層不可讀同一通道(原為invalid id: not a string); 自有存取器拋錯者於展開時拋(原為原例外)
+            it(`insertGfs: ${k.nm} is rejected as unreadable (fixed vocabulary, error event once with null data) and nothing is written`, async function() {
                 let cl = genCl()
                 let wo = WOrm(genOpt(cl))
-                await assert.rejects(() => callItem(wo, 'insertGfs', k.mk()), (err) => k.reGfs.test(msgOf(err)))
+                let evs = collect(wo)
+                await assert.rejects(() => callItem(wo, 'insertGfs', k.mk()), (err) => msgOf(err) === FIXED)
+                assert.strictEqual(nType(evs, 'error', 'insertGfs'), 1)
+                assert.strictEqual(evs[0].data, null)
+                assert.strictEqual(nType(evs, 'change'), 0)
                 assert.deepStrictEqual(await rawGfsIds(cl), [])
                 await dropCl(cl)
             })
 
-            //delGfs不複製: 值為Proxy者該筆ok為0; 自有存取器拋錯者於取id時即整批reject
-            it(`delGfs: ${k.nm} is not deleted`, async function() {
+            //delGfs: 複製處為元素與id之讀取; 值為Proxy者(非自有存取器)與自有存取器拋錯者皆整批reject(原為Proxy值該筆ok為0、自有存取器為原例外), 不刪除既有
+            it(`delGfs: ${k.nm} is rejected as unreadable (fixed vocabulary, error event once with null data) and nothing is deleted`, async function() {
                 let cl = genCl()
                 let woSeed = WOrm(genOpt(cl))
                 await woSeed.insertGfs([{ id: 'good', u8a: u8a() }])
                 let wo = WOrm(genOpt(cl))
-                if (k.isValue) {
-                    let r = await callItem(wo, 'delGfs', k.mk())
-                    assert.deepStrictEqual(r.map((v) => [v.ok, v.err]), [[0, 'invalid id: not a string at [data[0].id]']])
-                }
-                else {
-                    await assert.rejects(() => callItem(wo, 'delGfs', k.mk()), (err) => /^TRAP-SECRET$/.test(msgOf(err)))
-                }
+                let evs = collect(wo)
+                await assert.rejects(() => callItem(wo, 'delGfs', k.mk()), (err) => msgOf(err) === FIXED)
+                assert.strictEqual(nType(evs, 'error', 'delGfs'), 1)
+                assert.strictEqual(evs[0].data, null)
+                assert.strictEqual(nType(evs, 'change'), 0)
                 assert.deepStrictEqual(await rawGfsIds(cl), ['good'])
                 await dropCl(cl)
             })
 
-            //selectByPk、selectByPkGfs之參數為id值本身, 僅值為Proxy者適用, 回傳null
+            //selectByPk、selectByPkGfs之參數為id值本身, 僅值為Proxy者適用; 讀取即拋錯者(2026-11-20 oro557d3, 主控規則四第5點; 原回傳null)
+            //整批reject(invalid pk: must be a readable value), error事件於reject前恰發一次(數據參數null), 不連線; 可讀而非字串者仍回傳null(見api-readable S6)
             if (k.isValue) {
-                it(`selectByPk and selectByPkGfs: ${k.nm} is invalid, not an error`, async function() {
-                    let cl = genCl()
-                    let { wo, count } = withSpyClient(() => WOrm(genOpt(cl)))
-                    assert.strictEqual(await wo.selectByPk(k.mk().id), null)
-                    assert.strictEqual(await wo.selectByPkGfs(k.mk().id), null)
-                    assert.strictEqual(count.n, 0)
-                    await dropCl(cl)
-                })
+                for (let api of ['selectByPk', 'selectByPkGfs']) {
+                    it(`${api}: ${k.nm} is rejected as unreadable (not null), error event once, without connecting`, async function() {
+                        let cl = genCl()
+                        let { wo, count } = withSpyClient(() => WOrm(genOpt(cl)))
+                        let evs = collect(wo)
+                        await assert.rejects(() => wo[api](k.mk().id), (err) => msgOf(err) === 'invalid pk: must be a readable value')
+                        assert.strictEqual(count.n, 0)
+                        assert.strictEqual(nType(evs, 'error', api), 1)
+                        assert.strictEqual(evs.length, 1)
+                        assert.strictEqual(evs[0].data, null)
+                        await dropCl(cl)
+                    })
+                }
             }
 
         }

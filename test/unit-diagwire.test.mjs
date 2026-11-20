@@ -14,7 +14,8 @@ import { build, ops, specOf, run } from './tools/fakeMongo.mjs'
 //  S1 批次catch(11函數) outErr: 外來值經diag.err、本套件自身之固定詞彙錯誤(ownErr、cvFind)原樣
 //  S2 逐筆err(save、del、delGfs) outMsg: 外來值之訊息經diag.mask
 //  S3 closeClient(finally內關閉連線) diag.err
-//  S4 cloneData(insert、insertBulk、save、del於try之外複製使用端輸入) diag.err
+//  S4 cloneData(insert、insertBulk、save、del複製使用端輸入): 2026-11-20(第557項A3)起複製處拋錯者一律固定詞彙invalid data: must be a readable value, 外來值不轉出、不經diag.err;
+//     複製之後才讀取之外來值(原型上之存取器)仍經S1之outErr遮罩
 //  S5 genClient(new MongoClient)之同步拋錯: 於各函數之try內, 由S1遮罩
 //  S6 emitChange、emitError之訂閱函數拋錯 -> diag(level為log)
 
@@ -392,8 +393,10 @@ describe('逐筆err與其他站點之遮罩(S2、S3、S4)', function() {
         })
     }
 
+    //第557項全族對齊輪A3(2026-11-20 oro557d4): 複製處(cloneDeep)拋錯者, 與頂層不可讀同一通道, 固定詞彙invalid data: must be a readable value,
+    //外來值(使用端存取器所拋之Error, 其文字含憑證)不轉出(原為經diag.err遮罩後轉出, 無error事件), error事件恰一次(數據參數null); 本站點不再有外來值經diag.err
     for (let name of ['insert', 'insertBulk', 'save', 'del']) {
-        it(`S4 ${name}: 使用端輸入之存取器於cloneDeep時拋出之外來值經遮罩`, async function() {
+        it(`S4 ${name}: 使用端輸入之存取器於cloneDeep時拋出之外來值不轉出, 一律固定詞彙(A3), error事件恰一次`, async function() {
             let { w } = build({}, { url: URLX })
             let data = { id: 'a1' }
             Object.defineProperty(data, 'x', {
@@ -402,6 +405,23 @@ describe('逐筆err與其他站點之遮罩(S2、S3、S4)', function() {
                     throw foreign()
                 }
             })
+            let r = await run(w, (w) => w[name](data))
+            assert.ok(r.has, name)
+            assert.strictEqual(r.rej.message, 'invalid data: must be a readable value', name)
+            assert.strictEqual(r.rej.message.indexOf('Pw9xQz7k'), -1, name)
+            assert.deepStrictEqual(r.evs, [[name, 'invalid data: must be a readable value']], name)
+        })
+    }
+
+    //複製之後才讀取之外來值(原型上之存取器, 複製保留原型): 不在A3範圍, 仍為外來錯誤之診斷出口, 於批次catch經outErr遮罩(S1), 轉出之訊息遮罩憑證
+    for (let name of ['insert', 'insertBulk', 'save', 'del']) {
+        it(`S4 ${name}: 複製之後讀取原型上之存取器所拋之外來值(不在A3範圍)仍經遮罩`, async function() {
+            let { w } = build({}, { url: URLX })
+            let data = Object.create({
+                get id() {
+                    throw foreign()
+                }
+            }, { x: { value: 1, enumerable: true } })
             let r = await run(w, (w) => w[name](data))
             assert.ok(r.has, name)
             assert.strictEqual(r.rej.message, 'auth failed *** ***', name)
@@ -455,6 +475,8 @@ describe('站點盤點(原始碼掃描; 與rulebook R-DIAG-01之站點表一致)
     it('複製使用端輸入一律cloneData(4處: insert、insertBulk、save、del), 無裸cloneDeep(data)(僅cloneData內1處)', function() {
         assert.strictEqual((code.match(/data = cloneData\(data\)/g) || []).length, 4)
         assert.strictEqual((code.match(/cloneDeep\(/g) || []).length, 1)
+        //A3: cloneData於複製失敗回傳null(不轉出外來值), 4處呼叫端皆以rejectUnreadable走與頂層不可讀相同之通道
+        assert.strictEqual((code.match(/if \(data === null\) \{\s*return rejectUnreadable\('(insert|insertBulk|save|del)', 'data'\)/g) || []).length, 4)
     })
 
     it('cvOrmFind僅cvFind內1處呼叫(其拋出之固定詞彙錯誤登記為本套件自身之錯誤), 4處站點經cvFind', function() {
@@ -465,7 +487,8 @@ describe('站點盤點(原始碼掃描; 與rulebook R-DIAG-01之站點表一致)
     it('本套件自身之固定詞彙錯誤以ownErr建立(procPk、procDocs、insertGfs兩處共4處), 除建構期檢核外無裸new Error', function() {
         assert.strictEqual((code.match(/throw ownErr\(/g) || []).length, 4)
         let raws = [...code.matchAll(/new Error\(/g)].length
-        assert.strictEqual(raws, 2, `new Error僅允許建構期檢核之throw與ownErr內, 實為${raws}`)
+        //建構期之同步拋錯為本套件自身之固定詞彙(孤立代理字元之檢核與throwUnreadable各1處, R-ORMSTR-01、R-READABLE-01), 加ownErr內1處共3處
+        assert.strictEqual(raws, 3, `new Error僅允許建構期檢核之throw(2處)與ownErr內, 實為${raws}`)
     })
 
     it('new MongoClient僅genClient內1處; client = genClient()為11處', function() {
