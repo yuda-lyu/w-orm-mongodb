@@ -68,7 +68,7 @@
 - **回傳契約對照 HEAD golden**:`test/tools/diagScenario.mjs` 為情境(連線 26 步 + 不連線情境),`diagGoldenGen.mjs` 以 `DIAG_SRC`(指向 `git archive HEAD src` 解出的資料夾)產生 json;**產生兩次比對相同才算確定性**。非確定來源要正規化:自動產生的 UUID 主鍵 → `GENID`;驅動寫入時在事件 payload 的數據上補的 `_id`(ObjectId)→ `OID`。`save` 對不存在 id 內部先 `insert` 並發 `change`,所以 `save` 一次會有兩個 `change handler threw`(測試要預期兩行)。
 - **離線站點測試**:不合法 scheme(`http://127.0.0.1:27017`)讓 11 個函數都在 `new MongoClient` 階段 reject(不連線、不需 docker),可逐函數驗 `error` 站點;批次內全為無效主鍵的 `save`/`del`/`delGfs` 不連線仍發 `change`,可驗 `change` 站點。需要成功路徑的 `insert`/`insertBulk`/`insertGfs`/`delAll`/`delAllGfs` 才用 docker(`api-diaglog`)。
 - **修前紅作法**:對「HEAD 的 `WOrmMongodb.mjs` + 新 `getDiag.mjs` + 新測試」跑(`tmp/mongo-run01/pre/`):純函數測試仍綠,接線/站點/連線錯誤測試紅,紅綠分界即「接線」本身;`unit-diaglog` 20 紅/47 綠、`unit-urlerr` 108 紅/111 綠、`api-diaglog` 16 紅/9 綠。
-- **本輪 `./tmp/` 內之腳本與證據已於結案時清理,備份在 `C:\opensrcOper\dnow\20261028054319\agent-out\mongo-run01-evidence\`**(`mut/run.mjs`、各輪 `result-*.json`、`scripts/`〔探測腳本與輸出〕、`review/`〔提示詞、外審回覆、探測腳本〕、`pre-change-red/`、`golden/`);需要時由該處複製回 `tmp/mongo-run01/` 重建(路徑相對於 repo 根)。
+- **本輪 `./tmp/` 內之腳本與證據已於結案時清理,備份在 主控任務 `20261028054319` 之 `agent-out/mongo-run01-evidence/`**(`mut/run.mjs`、各輪 `result-*.json`、`scripts/`〔探測腳本與輸出〕、`review/`〔提示詞、外審回覆、探測腳本〕、`pre-change-red/`、`golden/`);需要時由該處複製回 `tmp/mongo-run01/` 重建(路徑相對於 repo 根)。
 - **變異執行器** `tmp/mongo-run01/mut/run.mjs`(最終 121 個變異,下述為首輪 78 個時之紀錄;`node tmp/mongo-run01/mut/run.mjs [名稱子字串…]`,在 repo 根為 cwd,需 docker,用 `quiet-run --lock` 包):複本在 `tmp/mongo-run01/mutwork/`,先跑兩個單元檔(約 6 秒)、未殺死才跑 `api-diaglog`(約 10 秒)。首輪存活 4 個(皆測試太弱,已補斷言後全殺死):無 URL 編碼形式(原斷言用的密碼本身已是編碼形式)、`maskErr` 不處理 stack(stack 延遲格式化,見上)、stack 不比對內建 getter(內建 stack 不含憑證時不可觀測)、寫回後屬性變不可寫不可設定(原未驗描述子)。
 - **Bash 工具守門**:`node -e` 寫檔/複製檔會被擋(整條指令不執行);批次機械操作先用 Write 寫 `.mjs` 再執行(`tmp/mongo-run01/mkreview.mjs` 即是);`sed -i` 同樣被擋。
 - **dist 檢查**:`tmp/mongo-run01/dist-check.mjs`(用 `w-package-tools/src/rollupFiles.mjs`、與 `toolg/gDistRollup.mjs` 同設定、輸出到 `tmp/` 不動 `dist/`)確認 `getDiag.mjs` 被打包,`require` 集合與現行 `dist` 相同(`mongodb`、`stream`、`util`,`util` 來自既有相依);並以打包結果實跑 error 站點。
@@ -92,7 +92,7 @@
 
 ### 變異測試法(不動 src)
 
-- 第 66 項批 1d 之執行器、各輪輸出、外審提示詞與報告、修前紅解析腳本已備份於 `C:\opensrcOper\dnow\20261020172106\agent-out\批1-mongodb-evidence\`(`mut/run.mjs`、`red/`、`review/`);repo 內 `tmp/` 已清空,需要時由該處複製回 `tmp/mut/run.mjs` 重建(以 `process.cwd()` 為 repo 根,`node tmp/mut/run.mjs [名稱子字串…]`;環境變數 `MUT_TEST`、`MUT_SUFFIX` 可改用指定測試檔,用來驗證「舊版測試是否抓得到某變異」).
+- 第 66 項批 1d 之執行器、各輪輸出、外審提示詞與報告、修前紅解析腳本已備份於 主控任務 `20261020172106` 之 `agent-out/批1-mongodb-evidence/`(`mut/run.mjs`、`red/`、`review/`);repo 內 `tmp/` 已清空,需要時由該處複製回 `tmp/mut/run.mjs` 重建(以 `process.cwd()` 為 repo 根,`node tmp/mut/run.mjs [名稱子字串…]`;環境變數 `MUT_TEST`、`MUT_SUFFIX` 可改用指定測試檔,用來驗證「舊版測試是否抓得到某變異」).
 - `tmp/mut/run.mjs`(被 `.gitignore`):讀 `src/WOrmMongodb.mjs`,以文字取代產生變異(`once` 要求樣式恰出現一次、`inFn` 限定在指定函數內),寫入 `tmp/mut/<名>/src/`,複製測試檔與 `lib/api-setup.mjs` 到 `tmp/mut/<名>/test/`,以 `mocha --bail` 執行(複本位於 repo 之下,`wsemi`、`mongodb` 由 node 往上層找到 repo 之 `node_modules`,不需連接點).**三段**:A=專屬案(`--grep "contract cases" --invert`,約 35 秒)→ B1=契約代表子集(孤立高位、NUL、emoji、反序、order、toctou、opt、free)→ B2=全部契約案例(約 6 分鐘以上);任一段轉紅即停,存活者才進下一段.並行 4 個,各用 `WORM_WF_CT=wfm-<名>` 之容器名.
 - **陷阱**:`--bail` 時契約案例排在專屬案之前會讓只在專屬案轉紅的變異等 3–5 分鐘,所以先跑專屬案.機器負載高時 B2 可超過 15 分鐘,存活者(等價變異或測試漏洞)會拖長整體時間,先查 A、B1 的結果再決定是否等 B2.
 - **變異揭露的測試漏洞(已補)**:①建構後改動 `opt` 的測試只涵蓋 3 個函數,GridFS 與 `del`、`save`、`insertBulk` 讀 `opt.cl|db` 的變異存活 → 測試擴充到 11 個函數,且 `insertBulk` 後要立刻核對 `rawIds` 才不被後面的 `save` 補回而遮蔽;②`insertGfs` 重複 id 清孤兒 chunks 的 `${cl}.chunks` 只在重複 id 時才用 → 加重複 id 並比對 chunks 筆數;③`selectByPk*` 放寬 NUL 時,案例表因 NUL 主鍵查無資料而回 `null` 仍全綠 → 以驅動預存含 NUL id 的列/檔,斷言 id 路徑不可讀、改、刪(外審 minimax F3 同樣指出).
@@ -110,7 +110,7 @@
 ### 測試容器與跑法
 
 - 本套件測試自建 docker 容器(`test/lib/api-setup.mjs` 之 `startContainer`),**埠由 `getFreePort()` 向系統要(非固定範圍)**,容器名每個測試檔各一(`worm-test-mongodb-basic`、`-gfs`、`-find-whitelist`、`-find-whitelist-gfs`),`--rm`,測完 `stopContainer`;映像用既有 `mongo:8`.**同名容器不可並行**:全套 `npm test`(mocha `--parallel`,檔案級並行)與變異執行不可同時跑.
-- 基準:`node C:/opensrcOper/tools/quiet-run.mjs --name baseline -- npm test` 約 20–30 秒,修前 233 案、修後 914 案(新增 495+186+既有 regex 案改寫).
+- 基準:主控之 `quiet-run --name baseline -- npm test` 約 20–30 秒,修前 233 案、修後 914 案(新增 495+186+既有 regex 案改寫).
 - 單檔:`npx mocha test/api-find-whitelist.test.mjs --timeout 180000`(不用 `.mocharc.json`).要逐案 JSON:`node node_modules/mocha/bin/mocha.js <檔…> --timeout 180000 --reporter json --reporter-option output=tmp/x.json`(非 `--parallel`;根層 `before/after` 會把各檔容器同時起好).
 
 ### 「修前紅」數字怎麼對帳
@@ -184,3 +184,11 @@
 - **規則外之既有缺陷(修前即有,已記帳本 R-PKOWN-01 已知限制 4)**:自有可列舉 `id` 而原型上有 frozen 或僅 getter 之同名 `id`,`cloneDeep` 以賦值複製而拋 `TypeError`,`insert`/`insertBulk`/`save`/`del` 整批 reject `invalid data: must be a readable value`(`insertGfs`、`delGfs` 正常)。lodash `cloneDeep` 之 `assignValue` 對「自有屬性值與原型同名屬性值不等」時以賦值寫入複本,與判斷「已帶」無關。
 - **逐項殺死變異之工具**:`tmp/omg569/mutrun.mjs`(一次性):讀 `src/WOrmMongodb.mjs` 於記憶體,以 `needle`(可指定第 n 個出現)文字取代,寫入 `tmp/omg569/mut/<名>/src/`,複製測試檔與 `test/lib/` 到該夾,`mocha --reporter json` 並行 3、各取不同容器名(環境變數 `WORM_PKOWN_CT`)。**統計須判 `passes === 0`**(`before` 鉤子失敗時 `failures` 為 1 而被誤判為殺死;該變異須重跑)。**跑到一半修改 `src` 或測試檔須全部重跑**(執行器於啟動時讀 `src`、每個變異啟動時才複製測試檔)。單檔 408 案約 2 分鐘(含起容器),同機他人起 docker 時 `before` 鉤子曾逾時 180 秒(重跑即過)。
 - **修前紅**:複本目錄 `tmp/omg569/red/{src,test,test/lib}`(`git archive --format=tar HEAD src | tar -x -C tmp/omg569/head`,相對路徑避免 Git Bash 之 `tar` 不吃磁碟機代號),以 `WORM_PKOWN_CT` 換容器名。依 describe 分組統計紅數:`insert` 28、`insertBulk` 28、`save` 28、`del` 16、`delGfs` 20、`insertGfs` 0(修前即合規)、批次 9、S1 事件資料 9、S2 之 `delGfs` 描述子 3、單一物件 1,共 142 紅/266 綠。
+
+## 2026-11-26 wsemi 1.9.79 型別判斷改內部槽判定之下游連動(omg492k,排程第 492 項批 10)
+
+- **跟跑紅 1 案**:wsemi 1.9.79 起 `isu8arr` 以內部槽判定(載入時取得 `%TypedArray%.prototype[@@toStringTag]` 之存取器,不讀物件之 `Symbol.toStringTag`、不觸發 `Proxy` 陷阱、對任何輸入不拋錯),`api-readable` S5 原案(覆寫標籤之 `Uint8Array` 子類計數,斷言標籤讀 1 次)讀到 0 次而紅,全庫其餘 5592 案綠。`src` 不需改:有效 `Uint8Array` 照常寫入,結果合帳本。
+- **原意有二,只有一個仍可觀察**:①有效 `Uint8Array` 照常寫入——改寫後仍釘住(並加 `selectByPkGfs` 取回位元組);②「`isu8arr` 只判一次」(第 557 項 A3 重構曾使其判兩次)——標籤讀取次數是舊行為下唯一之觀察量。內部槽判定為純函數(不讀標籤、無陷阱、結果不隨呼叫次數而變),`rows` 為已展開之資料屬性、使用端無從於兩次判定之間改其值,故「判一次或兩次」已無可觀察之差異:鏡像根植入「逐筆檢核重判」之變異,對 `api-readable`、`api-gfs`、`api-wellformed`、`api-pk-given` 3638 案全綠(等價變異)。不以替身取代 wsemi 計數呼叫(接縫不得用替身),不留無鑑別力之斷言,帳本規則句 10 改記「已不可觀察」及理由。
+- **鑑別力用鏡像根證明**:`./tmp/` 下鏡像根(只複製檔案、不建目錄連結:`package.json`、`src/`、`test/`、`node_modules/wsemi/{package.json,src,node_modules}` 之副本;其餘相依向上解析到本庫之 `node_modules`),於副本內把 `isu8arr` 改回 `Object.prototype.toString` 判定(包 `try`)。以 `git show HEAD:test/api-readable.test.mjs` 取舊測試與新測試各跑:舊測試+舊行為綠(讀 1 次,證明鏡像之 wsemi 確實被載入)、舊測試+舊行為+「重判」讀 2 次紅;新測試+舊行為 3 案全紅(讀 1 次、拒收覆寫標籤之真 `Uint8Array`、收下偽造標籤之物件)、新測試+新行為綠。跑法:以 cwd 為本庫根、mocha 指定鏡像內之測試檔(測試檔之相對匯入與 `wsemi` 之解析皆落鏡像內),`--grep` 縮短(根層 `before` 照常起容器)。
+- **新增之對照(行為變化,非本庫改碼)**:標籤被覆寫為他值之真 `Uint8Array` 現被收下(標籤判定之舊版拒收);偽造標籤為 `Uint8Array` 之一般物件現被拒 `invalid data[<k>].u8a`(標籤判定之舊版會收下並寫入)。
+- **通用教訓**:以「上游函數讀取某屬性之次數」當下游之觀察量,上游改實作(標籤改內部槽)即紅而下游行為並未改變;此類斷言只在「該讀取本身即下游規則」(如 `chkReadable` 探針只放在判斷函數回 `false` 之分支內)時才寫。若原意只是「不多做一次工作」,先查該工作對上游有無可觀察之副作用;無則於帳本寫明「不可觀察」及理由,不硬留斷言。

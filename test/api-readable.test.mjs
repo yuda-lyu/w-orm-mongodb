@@ -12,8 +12,8 @@ import { genUrl, startContainer, stopContainer } from './lib/api-setup.mjs'
 //  S2 可讀而型別不符之容器(5、'abc'、null、{}、[]、Map等)維持既有: 視為無數據, 正常結果, 無事件
 //  S3 選項(insert與save之option、option.returnList、option.autoInsert; 建構opt、opt.autoGenPk、opt.url、opt.db、opt.cl)讀取即拋錯者依各自之失敗通道
 //     (寫入入口: error事件恰一次後reject; 建構: 同步拋錯), 訊息invalid <名稱>: must be a readable value; 可讀而非預期型別者維持既有(K3取預設)
-//  S4 insertGfs之u8a不可讀: invalid data[k].u8a: must be a readable value; 可讀而非Uint8Array維持invalid data[k].u8a
-//  S5 探針只於判斷函數回false之後執行: 有效輸入不因探針多讀
+//  S4 insertGfs之u8a不可讀: invalid data[k].u8a: must be a readable value; 可讀而非Uint8Array(含偽造標籤為Uint8Array之一般物件, wsemi 1.9.79起以內部槽判定)維持invalid data[k].u8a
+//  S5 探針只於判斷函數回false之後執行: 有效輸入不因探針多讀(insertGfs之u8a以內部槽判定, 覆寫標籤之Uint8Array子類其標籤存取器讀0次)
 //  S6 selectByPk與selectByPkGfs之pk讀取即拋錯: reject固定詞彙invalid pk: must be a readable value(error事件恰一次, 數據參數null, 不連線); 可讀而非字串者(5、包裝物件、{}等)維持回null;
 //     select、delAll、delAllGfs之find不可讀依R-FIND-01(invalid find), 不變
 //  S8 存取器(容器可讀而成員為拋錯之getter, 主控規則四第2點): 讀取處捕捉並轉固定詞彙(不含存取器所拋之原例外文字); 資料內部之巢狀不可讀值(複製階段)與頂層不可讀同一通道(A3, 2026-11-20 oro557d4, 規則四第3點更正)
@@ -649,6 +649,7 @@ describe('readable', function() {
             { name: 'plain array', make: () => [1, 2, 3] },
             { name: 'ArrayBuffer', make: () => new ArrayBuffer(3) },
             { name: 'ownKeys trap throws (only keys unreadable)', make: () => new Proxy({}, { ownKeys: boom }) },
+            { name: 'plain object forging Symbol.toStringTag as Uint8Array (judged by the internal slot, not the tag)', make: () => ({ [Symbol.toStringTag]: 'Uint8Array', length: 3, 0: 1, 1: 2, 2: 3 }) },
         ]
 
         for (let c of u8aHostile) {
@@ -742,23 +743,28 @@ describe('readable', function() {
             })
         }
 
-        //insertGfs之有效u8a(Uint8Array)之標籤僅讀一次(判定結果沿用, 同修改前): 第557項A3之重構(展開 -> 不可讀掃描 -> 逐筆檢核)曾使isu8arr判定兩次(複審實測2次), 此案以計數標籤讀取之Uint8Array子類釘住
-        it('insertGfs: a valid Uint8Array has its tag read exactly once (the isu8arr verdict is reused by the per-item check)', async function() {
-            let cl = genCl()
-            let wo = WOrm(genOpt(cl))
-            let nTag = 0
-            class CountedU8a extends Uint8Array {
-                get [Symbol.toStringTag]() {
-                    nTag++
-                    return 'Uint8Array'
+        //insertGfs之有效u8a(真Uint8Array)以內部槽判定(wsemi 1.9.79起, dspec C2: isu8arr不讀Symbol.toStringTag、不受偽造或覆寫之標籤影響): 覆寫標籤之Uint8Array子類, 其標籤存取器讀取0次(不論回傳何值), 且照常寫入、取回之位元組相同;
+        //舊版wsemi以標籤判定時, 此案曾釘「標籤僅讀一次(isu8arr判定結果沿用; 第557項A3之重構曾使其判定兩次)」。內部槽判定為純函數(無可觀察之副作用, 結果不隨呼叫次數而變), 故「判定一次或兩次」已不可觀察(src之u8aOks沿用判定結果屬無觀察差異之寫法), 不再以任何斷言釘住, 見規則帳本R-READABLE-01規則句10
+        for (let tag of ['Uint8Array', 'Forged']) {
+            it(`insertGfs: a valid Uint8Array whose Symbol.toStringTag getter returns '${tag}' is judged by its internal slot (the getter is read 0 times) and is stored`, async function() {
+                let cl = genCl()
+                let wo = WOrm(genOpt(cl))
+                let nTag = 0
+                class TaggedU8a extends Uint8Array {
+                    get [Symbol.toStringTag]() {
+                        nTag++
+                        return tag
+                    }
                 }
-            }
-            let r = await wo.insertGfs([{ id: 'a', u8a: new CountedU8a([1, 2, 3]) }])
-            assert.deepStrictEqual(r, { n: 1, nInserted: 1, ok: 1 })
-            assert.strictEqual(nTag, 1, `the u8a tag was read ${nTag} times`)
-            assert.deepStrictEqual(await rawGfsIds(cl), ['a'])
-            await dropCl(cl)
-        })
+                let r = await wo.insertGfs([{ id: 'a', u8a: new TaggedU8a([1, 2, 3]) }])
+                assert.deepStrictEqual(r, { n: 1, nInserted: 1, ok: 1 })
+                assert.strictEqual(nTag, 0, `the u8a tag was read ${nTag} times`)
+                assert.deepStrictEqual(await rawGfsIds(cl), ['a'])
+                let back = await wo.selectByPkGfs('a')
+                assert.deepStrictEqual(Array.from(back.u8a), [1, 2, 3])
+                await dropCl(cl)
+            })
+        }
 
         //自有鍵只對標籤為[object Object]者讀取(iseobj所讀者): Buffer、型別陣列、String包裝物件等讀自有鍵須展開全部索引鍵, 判斷函數本即不讀;
         //以偽稱標籤為Map之Proxy計數ownKeys陷阱(Proxy之標籤取自get陷阱之Symbol.toStringTag): 須為0次
