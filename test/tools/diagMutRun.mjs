@@ -11,8 +11,9 @@ import { spawn } from 'child_process'
 
 let ROOT = path.resolve('.')
 let SRC = fs.readFileSync(path.join(ROOT, 'src/WOrmMongodb.mjs'), 'utf8')
-let TESTS = ['unit-diagwire.test.mjs', 'unit-diaglog.test.mjs', 'unit-urlerr.test.mjs']
-let TOOLS = ['fakeMongo.mjs', 'diagScenario.mjs', 'urlerrWorker.mjs']
+//環境變數DIAGMUT_TESTS(逗號分隔之測試檔名)有給時只跑所列之檔, 用於判定某變異是否被該檔(而非另外兩檔)殺死
+let TESTS = process.env.DIAGMUT_TESTS ? process.env.DIAGMUT_TESTS.split(',') : ['unit-diagwire.test.mjs', 'unit-diaglog.test.mjs', 'unit-urlerr.test.mjs']
+let TOOLS = ['fakeMongo.mjs', 'diagScenario.mjs', 'urlerrWorker.mjs', 'urlerrLegacy.mjs']
 let MOCHA = path.join(ROOT, 'node_modules/mocha/bin/mocha.js')
 let BASE = path.join(ROOT, 'tmp/diagmut')
 let WORK = path.join(BASE, 'work')

@@ -33,17 +33,35 @@
 |---|---|
 | `test/unit-diagwire.test.mjs`(不連線,假驅動 `test/tools/fakeMongo.mjs`) | **接線測試**:①wsemi 共用語料(`wsemi/src/_diagCases.mjs`)wire 子集(20 案)之處置表(`DISPOSITION`,語料新增 wire 案時「分類完整」案轉紅)× 真實呼叫點:`error`/`change` 兩站之 `funLog` detail、11 函數 × 驅動接縫外來值之 reject(語料 9 案 `detail+reject`)、C01/O01/O15/R01/R02/R04/R11/R12 之接線版;②固定詞彙原樣:本套件自身之固定詞彙錯誤全集 12 型(整批 reject 與逐筆 err、`error` 事件)× 9 個為其子字串之密碼,與對照組(密碼非子字串)逐項相同;③S2(save、del、delGfs 逐筆,含字串值與無憑證)、S3(11 函數 `close` reject)、S4(4 函數 cloneDeep 存取器)、S5(11 函數 `new MongoClient` 拋錯);④站點盤點(原始碼掃描) |
 | `test/unit-diaglog.test.mjs`(不連線) | 單一出口掃描(無 `console`、無 `src/getDiag.mjs`、無內建模組);11 函數 × `error` 訂閱函數拋錯、`change` 站點(皆 `console.log`,stdout)、非 Error 值、`logDetail`/`funLog` 與選項型別/getter/快照、診斷輸出不使操作之 reject 變例外、`funLog` 回傳 reject 之 promise |
-| `test/unit-urlerr.test.mjs`(不連線,真驅動) | 37 種連線字串形態 × 11 函數(真驅動產生之錯誤,非語料所能代替):reject 為遮罩後同類別(原型相同)之錯誤、訊息逐字等於預期、message/stack/cause/inspect 無憑證、`error` 事件 payload;建構函式固定詞彙;非字串 url;固定詞彙(find 白名單外)原樣;spy 驗 `MongoClient` 仍以原 url 建立;子行程未捕獲 reject 之 stderr |
+| `test/unit-urlerr.test.mjs`(不連線;三組,依驅動 7.9.1 之行為調適,見〈驅動版本與回顯〉) | ①**真驅動不回顯形態**:37 種連線字串形態 × 11 函數(驅動 7.9.1 之原錯誤不含憑證):reject 與驅動原錯誤同類別(原型相同)、訊息逐字相同、message/stack/cause/inspect 無憑證、`error` 事件 payload;各形態另有「驅動原錯誤不含憑證」之基準案(驅動日後再度回顯即轉紅,提示改列第②組);②**真驅動仍回顯形態**:8 種整數值形態(憑證為整數或負整數置於 `maxPoolSize`/`heartbeatFrequencyMS`/`family`;一般設定值、單獨帳號、合法整數之不得遮罩案)× 11 函數:驅動原錯誤確實含該片段、本套件輸出之憑證遮為 `***`、非憑證原樣;③**替身驅動重現 7.9.0 之回顯形態**:29 種形態(7.9.0 與 7.9.1 原訊息不同者) × 11 函數(經 `fakeMongo` 之 `ctor` 接縫注入 `test/tools/urlerrLegacy.mjs` 產生之錯誤:類別取自驅動、訊息含回顯片段、`cause.input` 含回顯字串):遮罩後訊息逐字等於預期、各回顯片段不得出現;另:建構函式固定詞彙;非字串 url;固定詞彙(find 白名單外)原樣;spy 驗 `MongoClient` 仍以原 url 建立;子行程未捕獲 reject 之 stderr(第②組之遮罩案以真驅動、第③組之遮罩案以替身驅動〔`urlerrWorker.mjs` 之環境變數 `LEGACY`〕) |
 | `test/api-diaglog.test.mjs`(自建 docker 容器) | 8 個會發 `change` 之函數 + `error` 站點之預設輸出;`logDetail`(label 加遮罩副本);`funLog`;選項型別/快照;回傳契約對照 HEAD golden;驅動執行期連線錯誤不含帳密 |
-| `test/tools/fakeMongo.mjs`、`diagScenario.mjs`、`diagGoldenGen.mjs`、`diagGolden.json`、`urlerrWorker.mjs` | 假驅動(`ctor`/`connect`/`db`/`close`/`col` 接縫注入外來值)、共用情境、golden 產生器、golden(HEAD 產生)、子行程腳本 |
+| `test/tools/fakeMongo.mjs`、`diagScenario.mjs`、`diagGoldenGen.mjs`、`diagGolden.json`、`urlerrWorker.mjs`、`urlerrLegacy.mjs` | 假驅動(`ctor`/`connect`/`db`/`close`/`col` 接縫注入外來值)、共用情境、golden 產生器、golden(HEAD 產生)、子行程腳本(環境變數 `LEGACY` 有給時改以替身驅動)、替身驅動之錯誤產生器(重現驅動 7.9.0 之回顯形態) |
 
-**變異**(須轉紅;於 `./tmp/diagmut/work/<名>/` 之複本執行,不動 `src/`;執行器 `test/tools/diagMutRun.mjs`〔入庫〕,`node C:/opensrcOper/tools/quiet-run.mjs --lock --name <名> -- node test/tools/diagMutRun.mjs [名稱子字串…]`,離開碼 0 表全數殺死;用法見 `sgud/exp/experience.md`):漏包批次 catch(11 函數各一)、誤包固定詞彙(`outErr` 恆包、`ownErr` 不登記、`cvFind` 不登記、4 處 `ownErr` 退回裸 `new Error`、4 處 `cvFind` 退回 `cvOrmFind`)、逐筆 err 未遮(`outMsg` 不遮、3 站各退回 `getErrMsg`)、`closeClient`/`cloneData` 不遮與 11+4 站旁路、宣告退化(秘密為空、無 `patterns`/`codes`/`safeKeys`、`opt` 未傳)、level 改 `'error'`、摘要移除、自寫遮罩。結果見 mig-mongo 報告與 `sgud/exp/experience.md`。
+**變異**(須轉紅;於 `./tmp/diagmut/work/<名>/` 之複本執行,不動 `src/`;執行器 `test/tools/diagMutRun.mjs`〔入庫〕,以主控之安靜執行器加 `--lock` 包:`quiet-run --lock --name <名> -- node test/tools/diagMutRun.mjs [名稱子字串…]`,離開碼 0 表全數殺死;環境變數 `DIAGMUT_TESTS=<測試檔名,逗號分隔>` 只跑所列之檔,用於判定某變異是否被該檔〔而非另兩檔〕殺死;用法見 `sgud/exp/experience.md`):漏包批次 catch(11 函數各一)、誤包固定詞彙(`outErr` 恆包、`ownErr` 不登記、`cvFind` 不登記、4 處 `ownErr` 退回裸 `new Error`、4 處 `cvFind` 退回 `cvOrmFind`)、逐筆 err 未遮(`outMsg` 不遮、3 站各退回 `getErrMsg`)、`closeClient`/`cloneData` 不遮與 11+4 站旁路、宣告退化(秘密為空、無 `patterns`/`codes`/`safeKeys`、`opt` 未傳)、level 改 `'error'`、摘要移除、自寫遮罩。結果見 mig-mongo 報告與 `sgud/exp/experience.md`。
+
+**驅動版本與回顯**(2026-11-27,第 679 項:驅動 `mongodb` 7.9.0 → 7.9.1,`package.json` 範圍 `^7.9.1`;防護不拆,測試依驅動新行為調適)
+
+- **7.9.1 之行為變化**(對 `npm pack mongodb@7.9.0` 解包之驅動與 `node_modules/mongodb` 7.9.1 各實跑 `new MongoClient(url)`,先以 35 種連線字串形態比對兩版(7.9.0 有 18 種含憑證片段),再以 20 種選項值形態探 7.9.1 仍回顯者;7.9.1 之 35 種形態**全數**不含任何憑證片段,選項值形態中僅整數值仍被回顯):
+
+| 形態 | 驅動 7.9.0(回顯) | 驅動 7.9.1 |
+|---|---|---|
+| 主機位址項解析失敗(缺 `@` 主機、反向書寫、`host:abc`、多主機之一、IPv6 括號不成對、`:99999`;`MongoRuntimeError`) | `Unable to parse <主機位址項> with URL`,`cause.input` = `iLoveJS://<項>` | 固定 `Unable to parse host with URL`,`cause.input` 已移除(`cause` 仍為 `TypeError: Invalid URL`) |
+| 非整數之選項值(`maxPoolSize=<憑證>` 等;`MongoParseError`) | `Expected X to be stringified int value, got: <值>` | `Expected X to be stringified int value`(不帶值) |
+| 帳號段含 `/` 等未編碼字元 | `Username contains unescaped characters <帳號>` | 固定 `Username contains unescaped characters` |
+| 無 `=` 之參數、未知參數 | `URI option "<整段參數>" cannot be specified with no value`(`MongoAPIError`,整段回顯) | 未知參數先檢核:`connection string contains unsupported options, at position: N`(`MongoParseError`,只報位置);已知選項無值:`URI option "<驅動自有名稱>" …` |
+| 重複參數、`authMechanism`、`compressors`、`srvAllowedHostsSuffix`、`readConcern`/`writeConcern`/`pkFactory` 值 | 回顯值或參數名 | 不帶值、改用驅動自有名稱 |
+| **整數值**(`maxPoolSize`、`heartbeatFrequencyMS` 等負值:`X can only be a positive int value, got: <整數>`;`family`:`Option 'family' must be 4 or 6 got <整數>.`) | 回顯 | **仍回顯**(7.9.1 之 `got:` 改為剖析後之整數,非原字串) |
+| 固定訊息(密碼含未編碼之 `@`/`/`、`%` 不合法、`srv` 帶 port、scheme 錯、空主機、`mongodb://`) | 固定 | 不變 |
+
+- **規則(防護層不拆)**:`outErr`/`diag.err`、`getDiagSecrets({ urls: [url] })`、樣式 `mongoHostEcho` 全數保留(`src/` 未改);驅動不再回顯 ≠ 本套件可不遮罩:其他形態(上表末列之整數憑證)、日後驅動版本、他驅動路徑仍可能回顯。
+- **測試之三組基準**(`unit-urlerr`):①真驅動 7.9.1 不回顯形態以「本套件輸出與驅動原錯誤逐字相同、任何可見文字不含憑證」為準(含不得過度遮罩案),各形態之「驅動原錯誤不含憑證」基準案於驅動再度回顯時轉紅(須改列第②組並補期望);②真驅動仍回顯形態以整數值憑證為準(基準案斷言驅動原錯誤確實含該整數);③7.9.0 之回顯形態以**替身驅動**重現(`urlerrLegacy.mjs`,訊息與 `cause.input` 取自 7.9.0 實跑,類別取自驅動匯出),使 `mongoHostEcho` 樣式與非整數之各回顯形態仍有鑑別力(缺此組則 `no-patterns` 變異不再被 `unit-urlerr` 殺死)。**驅動再升版時**:先對新版驅動逐形態實跑 `new MongoClient(url)`(列 `message`、`cause`、`cause.input`,並比對兩版訊息之差異),再決定各形態屬哪一組;各形態之舊版訊息可以 `npm pack mongodb@<舊版>` 解包後對照。
+- **變異證明**(拿掉本套件遮罩,`DIAGMUT_TESTS=unit-urlerr.test.mjs`):見 `sgud/exp/experience.md`〈驅動 7.9.1 調適(第 679 項)〉。
 
 **已知限制**
 
 1. wsemi 之已知限制(dspec §5):載入前已掛同名 `Error.prepareStackTrace` hook、私有欄位無法複製、Node < 20.16 或瀏覽器無 `util.types` 時 Proxy 不可偵測、reject 清單之短密碼(< 4 字元)不遮、未走訪之捨棄子樹內之 rejected Promise 不標記等;驅動自身日誌與 `process.emitWarning` 不經出口(S10)。
 2. 第三方原生層直接寫 stderr 者不在 JS 層可攔範圍(本套件無此類相依)。
 3. **摘要 `errType` 對驅動錯誤恆為 `Error`**(`MongoServerError`、`MongoNetworkError` 等不在 wsemi 內建類別名,本套件未宣告 `types`):摘要只用於「訂閱函數拋出之值」(`diag.brief` 之唯一呼叫點為 `emitChange`/`emitError` 之 catch),驅動錯誤不經此;若需列驅動類別名,於 `cfg.types` 宣告(待裁示,不影響遮罩)。`errCode` 對 `MongoServerError` 之整數 `code`(`11000`、`13`、`18`、`59` 等)依 `mongoServer` 集合收錄,集合外(如 `40324`、`73`)不收。
-4. **P8(`getDiagBriefErr` 是否另讀 `codeName`)結論:不需要**。2026-10-29 以真驅動(mongodb 7.5.0、`mongo:8` 容器)24 種錯誤形態實測:`MongoServerError` 與 `MongoBulkWriteError` 之 `code` 恆為**整數**(`codeName` 為字串且僅部分錯誤帶自有資料屬性),`mongoServer` 集合內之 `codeName` 字串從不命中(`code` 非字串);凡 `codeName` 在集合內者其整數 `code` 亦在集合內(0 例僅 `codeName` 命中),集合外者(`40324`/`Location40324`、`73`/`InvalidNamespace`)兩者皆不在;網路類錯誤(`MongoServerSelectionError`、`MongoNetworkError`)無 `code`。證據:`C:\opensrcOper\dnow\20261029002013\agent-out\mig-mongo-p8-證據.json`(逐項 `code`/`codeName`/摘要)。
+4. **P8(`getDiagBriefErr` 是否另讀 `codeName`)結論:不需要**。2026-10-29 以真驅動(mongodb 7.5.0、`mongo:8` 容器)24 種錯誤形態實測:`MongoServerError` 與 `MongoBulkWriteError` 之 `code` 恆為**整數**(`codeName` 為字串且僅部分錯誤帶自有資料屬性),`mongoServer` 集合內之 `codeName` 字串從不命中(`code` 非字串);凡 `codeName` 在集合內者其整數 `code` 亦在集合內(0 例僅 `codeName` 命中),集合外者(`40324`/`Location40324`、`73`/`InvalidNamespace`)兩者皆不在;網路類錯誤(`MongoServerSelectionError`、`MongoNetworkError`)無 `code`。證據:主控任務 `20261029002013` 之 `agent-out/mig-mongo-p8-證據.json`(逐項 `code`/`codeName`/摘要)。
 5. 單獨帳號於對外錯誤值不遮(D3/Q3):如查詢參數 `proxyUsername` 之值被驅動回顯時原樣(修改前遮罩);`帳號:密碼` 並列形式與 `proxyPassword` 之值照遮。`/` 分段:`CORP/帳號` 遮為 `***/***`。
 6. 含憑證之對外錯誤為**同類別之副本**(非同一物件,非原地改寫);不含憑證者為原物件。下游若以錯誤物件之身分比較(`===`)含憑證之 reject,身分不同。

@@ -384,7 +384,7 @@
    - 無過渡期(fail-closed,dspec〈一之三〉D11).庫外專案若依賴被移除之運算子,改為 `select` 後在記憶體過濾.
 2. **2026-10-28 診斷輸出**(R-DIAG-01,mongo-run01;版號由發布流程決定,本次未改 `version`):
    - `change`/`error` 訂閱函數拋錯時,console 預設改為只輸出 `change handler threw { mode, errType, errCode? }` / `error handler threw { … }`,不再輸出整個錯誤(訊息、堆疊、其中的資料值與 id);要還原舊輸出加 `logDetail: true`,或以 `funLog(label, safe, detail)` 接收。連線憑證於所有管道以 `***` 遮罩。
-   - 驅動在連線字串無法解析時所拋之錯誤(`Unable to parse 帳號:密碼 with URL` 等,含 `cause.input` 與 stack)中的憑證改為 `***`;類別、原型、訊息前綴不變;不含憑證之訊息不變。
+   - 驅動在連線字串無法解析時所拋之錯誤(`Unable to parse 帳號:密碼 with URL` 等,含 `cause.input` 與 stack)中的憑證改為 `***`;類別、原型、訊息前綴不變;不含憑證之訊息不變。(驅動 `mongodb` 7.9.1 起上列形態多數已不回顯,遮罩維持為防護層,見 `sgud/rule/rulebook_diag.md`〈驅動版本與回顯〉。)
    - 不變:各操作 resolve/reject 內容、`change`/`error` 事件 payload 與時機(對照 HEAD golden)。
 3. **2026-10-29 診斷輸出與遮罩改由 wsemi 共用模組擁有**(R-DIAG-01,mig-mongo;需 `wsemi` ≥ 1.9.31;版號由發布流程決定,本次未改 `version`;不保留舊行為):
    - `opt.logDetail` 為 `true` 之輸出由舊版 `console.log(err)` 裸輸出改為 `console.log(label, 錯誤之遮罩副本)`(多標籤、副本不沿用使用端原型,仍為 stdout);預設輸出與 `funLog` 引數不變。

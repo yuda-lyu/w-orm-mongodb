@@ -2,7 +2,7 @@
 
 本檔記當前已開發功能之最新狀態(各功能做到哪裡、對應之規則帳本條目與測試檔、已知缺口與待辦、最近一次驗證或發布之版本),只記現況、不寫過程(過程見 `sgud/exp/experience.md`)。藍圖(規則)見 `sgud/rule/rulebook.md`(R-DIAG-01 之細節見 `sgud/rule/rulebook_diag.md`)。
 
-- 套件版本:`package.json` 1.2.42(2026-11-20 第 569 項 omg569 未改 `version`;發布由使用者/主控負責)。相依:`wsemi` ^1.9.70(診斷輸出與遮罩、字串良構檢核、`chkReadable` 可讀性探針之共用模組;2026-11-20 起新引用 `wsemi/src/chkReadable.mjs`、`wsemi/src/isobj.mjs`)、`mongodb` ^7.9.0(非自有套件)。
+- 套件版本:`package.json` 1.2.42(2026-11-20 第 569 項 omg569 未改 `version`;發布由使用者/主控負責)。相依:`wsemi` ^1.9.70(診斷輸出與遮罩、字串良構檢核、`chkReadable` 可讀性探針之共用模組;2026-11-20 起新引用 `wsemi/src/chkReadable.mjs`、`wsemi/src/isobj.mjs`)、`mongodb` ^7.9.1(非自有套件;2026-11-27 第 679 項由 7.9.0 升 7.9.1,見下〈驅動 7.9.1 調適〉)。
 - 本檔於 2026-10-28(mongo-run01)首次建立;更早之功能現況請以 `sgud/rule/rulebook.md` 之 R-FIND-01、R-ORMSTR-01 與〈破壞性變更紀錄〉為準。
 
 ## 功能現況
@@ -17,6 +17,13 @@
 | **主鍵「未帶」與「給了而不合格」之分界(2026-11-19 omg492i;wsemi 1.9.69 連動修正)**:只有 `undefined`、`null`、`''` 視為未帶(`autoGenPk` 開自動產生/關整批 reject);給了而非字串(數字、布林、物件、陣列、包裝物件、`Symbol`、`BigInt`、`Proxy` 等)一律 `invalid id: not a string`,不補值、不隨 `autoGenPk` 改變 | R-PKGIVEN-01 | `api-pk-given`(247 案;oro557d3 將 `selectByPk`/`selectByPkGfs` 之不可讀 `pk` 兩案由「回 `null`」改為 reject,各拆為 2 入口)、`api-wellformed`(〈String 包裝物件之 id 應 reject〉) | 完成(見下) |
 | **讀取即拋錯(不可讀)之輸入依原失敗通道拒絕,改用 wsemi `chkReadable`(2026-11-20 oro557d、oro557d3,第 557 項)**:6 個收資料容器之入口之 `data`、`insert`/`save` 之 `option` 與 `option.returnList`/`option.autoInsert`、`insertGfs` 之 `u8a`、`selectByPk`/`selectByPkGfs` 之 `pk`、建構 `opt`/`opt.autoGenPk`/`opt.url`/`opt.db`/`opt.cl` 為不可讀者,整批 reject(`error` 事件恰一次)或建構同步 throw,固定詞彙 `invalid <名稱>: must be a readable value`;容器可讀而成員為拋錯之存取器者亦轉固定詞彙(讀取處見帳本);可讀而型別不符者不變(`pk` 為 `5`、包裝物件等仍回 `null`) | R-READABLE-01 | `api-readable`(825 案;含 S9 之 A1~A6 逐代號)、`api-pk-given`(247 案)、`unit-diagwire`(97 案;`new Error(` 計數 3) | 完成(見下;2026-11-20 oro557d4 起複製階段之巢狀不可讀值亦轉固定詞彙,A3、A4) |
 | **主鍵只認自有可列舉之資料屬性(2026-11-20 omg569,第 569 項全族)**:列之 `id` 為繼承(原型鏈上,不論值之型別)或自有不可列舉者視為未帶:`insert`/`insertBulk`/`save` 於 `autoGenPk` 開補新 `id`(`Object.defineProperty` 設為自有可列舉資料屬性)、關整批 reject `invalid data[<k>].id, autoGenPk is false`;`del`/`delGfs` 該筆 `ok:0` `invalid id: not a string`,不刪除庫內同值之列/檔案;`insertGfs` 修前即合規 | R-PKOWN-01 | `api-pk-own`(408 案) | 完成(見下) |
+
+### 驅動 7.9.1 調適(2026-11-27,第 679 項,R-DIAG-01)
+
+- 現況:外部依賴 `mongodb` 由 7.9.0 升 7.9.1(`package.json` `^7.9.1`,由主控改好);`src/` **未改**、防護(`diag.err`、`getDiagSecrets`、`mongoHostEcho`)不拆。驅動 7.9.1 對連線字串解析失敗之訊息不再回顯片段(35 種形態全數不含憑證),僅**整數值**(`maxPoolSize`/`heartbeatFrequencyMS` 之負值、`family`)仍回顯;形態對照見帳本 `sgud/rule/rulebook_diag.md`〈驅動版本與回顯〉。
+- `test/unit-urlerr.test.mjs` 依驅動新行為改寫為三組(922 案,修改前於 7.9.1 為 288 紅):①真驅動不回顯 37 形態(輸出與驅動原錯誤逐字相同、不含憑證、不過度遮罩);②真驅動整數回顯 8 形態(遮除整數憑證、非憑證原樣);③替身驅動(新增 `test/tools/urlerrLegacy.mjs`,經 `fakeMongo` 之 `ctor` 接縫)重現 7.9.0 之 29 種回顯形態;`urlerrWorker.mjs` 加環境變數 `LEGACY`;`diagMutRun.mjs` 加 `DIAGMUT_TESTS`、`TOOLS` 補 `urlerrLegacy.mjs`。
+- 驗證:單檔 922 passing(連跑 4 次);全套(`npm test`,`quiet-run --lock`)6046 passing / 0 failing / 0 pending(7m21s);「拿掉本庫遮罩」之變異於新檔 334 紅(整數回顯組 55、替身組 253、stderr 26),不回顯組 0(設計如此);新測試(7.9.1)與舊測試(7.9.0 鏡像)對既有 53 個變異之殺死名單逐項相同(各 13 殺死、40 存活〔由 `unit-diagwire`/`unit-diaglog` 殺死〕);細節見 `sgud/exp/experience.md`〈驅動 7.9.1 調適〉。
+- 已知缺口/待辦:`no-patterns`(拿掉 `mongoHostEcho`)變異於 `unit-urlerr` 新舊兩版皆存活(URL 導出之秘密已涵蓋主機位址項,樣式為備援),未補案;驅動日後再升版時依帳本〈驅動版本與回顯〉步驟重測各形態之回顯。
 
 ### R-PKOWN-01 主鍵只認自有可列舉之資料屬性(2026-11-20,omg569,第 569 項)
 

@@ -2,6 +2,31 @@
 
 本檔為執行工作時特有之累積經驗,留給後續之嘗試、執行與判斷,由agent自行編列、擴充與維護.
 
+## 驅動 7.9.1 調適(2026-11-27,第 679 項,規則 R-DIAG-01):外部驅動升版使「驅動確實回顯」之前提消失時,測試之改寫作法與陷阱
+
+**結論先行**:`mongodb` 7.9.0 → 7.9.1 把連線字串解析失敗之訊息與 `cause.input` 之回顯拿掉(35 種形態全不含憑證),僅整數值仍回顯;`src` 不動、防護不拆,只改 `test/unit-urlerr.test.mjs`(三組)與新增 `test/tools/urlerrLegacy.mjs`。形態對照表見帳本 `sgud/rule/rulebook_diag.md`〈驅動版本與回顯〉;此處只記作法與陷阱。
+
+### 作法(可重跑)
+
+- **先以兩版驅動逐形態實跑**,不憑讀碼:`npm pack mongodb@<舊版> --pack-destination ./tmp/<名>`、`tar -x -C` 解包(不覆蓋 `node_modules`),腳本以 `pathToFileURL` 動態匯入舊版 `lib/index.js` 與新版各跑 `new MongoClient(url)`,逐形態印 `constructor.name`、`message`、`cause.message`、`cause.input` 與「哪些憑證標記出現在 `util.inspect(err, {showHidden:true})` + `stack` + cause 鏈」。解包夾位於 repo 之下,其相依(`bson`、`mongodb-connection-string-url`)由上層 `node_modules` 解析,不需連結。
+- **找「新版仍回顯」之形態**:`Grep "Error\(\`" node_modules/mongodb/lib/connection_string.js` 列出所有帶樣板字串之訊息站點,逐個構造 URL 實測(20 種選項值形態);結果僅 `getIntFromOptions`/`getUIntFromOptions`(`can only be a positive int value, got: <整數>`)與 `family`(`must be 4 or 6 got <整數>.`)仍帶值。**帶值者為剖析後之整數**,故憑證為整數(或負整數)才會被回顯;7.9.0 之 `got:` 是原字串。
+- **三組測試之分工**(各自證明什麼,見 `unit-urlerr` 檔頭):①真驅動不回顯形態只守「輸出與驅動原錯誤逐字相同、不過度遮罩」,對「拿掉遮罩」之變異**無鑑別力**(驅動不回顯,拿掉遮罩輸出仍相同),不可拿它當遮罩有效之證據;②真驅動整數回顯形態證明遮罩對**真驅動**之回顯有作用;③替身驅動(`urlerrLegacy.mjs` 經 `fakeMongo` 之 `ctor` 接縫)證明非整數之回顯形態(含 `Unable to parse 帳號:密碼 with URL`、`cause.input`、`CORP/帳號`)仍被遮,並使 `urlerrWorker.mjs` 之子行程 stderr 案能重現 7.9.0 之輸出。
+- **替身之忠實度**:錯誤類別取自驅動匯出(`mongodb[type]`,原型與 `instanceof` 皆為真類別)、訊息逐字取自對 7.9.0 解包之驅動實跑、`cause` 為 `TypeError('Invalid URL')` 含 `code`/`input`;基準案斷言替身確實回顯(訊息與 `cause.input` 含帳密)。
+- **「驅動原錯誤不含憑證」之基準案**放在真驅動不回顯組每個形態內:驅動日後再度回顯該形態時該案轉紅,訊息提示改列整數回顯組並補期望,不致於靜默失去鑑別力。
+- **舊測試 + 舊版驅動之鏡像根**:`git archive HEAD test/unit-urlerr.test.mjs test/tools | tar -x -C ./tmp/<名>/old`、複製現行 `src/WOrmMongodb.mjs`、解包之 7.9.0 複製為 `old/node_modules/mongodb`(複製,不建連結);以 `quiet-run --cwd ./tmp/<名>/old` 於該夾執行(舊測試 471 passing,證明鏡像為忠實之舊環境;同一舊測試於 7.9.1 為 288 failing)。複本內之 `diagMutRun.mjs` 只改 `TESTS`(只留 `unit-urlerr`)與 `MOCHA`(指向 repo 之 mocha)。
+
+### 驗證結果(變異)
+
+- **新測試(7.9.1) 與舊測試(7.9.0 鏡像)對全部 53 個既有變異之殺死名單逐項相同**:各殺死 13(漏包批次 catch 11 個、`secrets-empty`、`own-mask-in-outErr`),其餘 40 個(固定詞彙、`closeClient`/`cloneData`、`level`/摘要等)由 `unit-diagwire`、`unit-diaglog` 殺死(本檔不負責);無一項只有舊版殺得到。**`no-patterns`(拿掉 `mongoHostEcho`)於新舊兩版皆存活**:URL 導出之秘密已涵蓋主機位址項(無 `@` 時整段、`db.local:abc` 等),樣式為備援;非本輪新增之缺口。
+- **「拿掉本庫遮罩」之分組變異**(複本,`outErr` 恆回原錯誤):922 案中 334 紅——整數回顯組 55、替身組 253、子行程 stderr 26(真驅動 5、替身 21);真驅動不回顯組 0(設計如此,見上)。`secrets-empty` 203 紅(整數回顯組 55、替身 132、stderr 16);`secrets` 與 `patterns` 同拿掉為 334 紅。**過度遮罩**:把 `Expected` 列為秘密 → 316 紅(真驅動不回顯組 154、替身組 154、stderr 8);單獨帳號亦遮(違反 D3)→ 90 紅(不回顯組 22、整數回顯組 11、替身 55、stderr 2)。
+
+### 陷阱(本輪實際踩到)
+
+1. **`getDiagSecrets` 回傳凍結物件**(`Object.isFrozen` 為 `true`,連 `reject` 陣列):變異腳本就地 `push` 會令全部案崩潰(844 紅且兩個變異數字相同),不是變異被殺死;須組新物件 `{ detail, reject: [...] }`。**兩個不同變異之失敗數完全相同時先查是否為構造期崩潰。**
+2. **選項值形態之回顯與「訊息是否帶值」要分開看**:7.9.1 之 `Expected maxPoolSize to be stringified int value` 不帶值,但 `maxPoolSize=-123` 之 `got: -123` 帶值;只測非整數之憑證值會得出「驅動已全數不回顯」之錯誤結論。
+3. **`DIAGMUT_TESTS`**:`diagMutRun.mjs` 新增環境變數(逗號分隔測試檔名)只跑所列之檔,用以判定某變異是否被該檔(而非另兩檔)殺死;於 Bash 以環境變數前綴傳給 `quiet-run`(其子行程繼承)。
+4. **`diagMutRun.mjs` 既有 4 個 eslint `no-template-curly-in-string` 錯誤(needle 字串,HEAD 即有)**非本輪所致,未改。
+
 ## 連線於操作空檔被中斷(2026-10-31,第 209 項,規則 R-CLIENTERR-01):查證「是否須自掛 MongoClient error 監聽」之作法與陷阱
 
 **結論先行**:不須自掛(驅動已預掛),`src` 未改。帳本 R-CLIENTERR-01 有逐物件表與盤點指令;此處只記作法與陷阱。

@@ -1,9 +1,9 @@
 {
   "name": "w-orm-mongodb",
-  "version": "1.2.54",
+  "version": "1.2.55",
   "main": "dist/w-orm-mongodb.umd.js",
   "dependencies": {
-    "mongodb": "^7.9.0",
+    "mongodb": "^7.9.1",
     "wsemi": "^1.9.82"
   },
   "devDependencies": {
